@@ -1,0 +1,18 @@
+{
+  "name": "@nrl/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@nrl/shared": "*",
+    "fastify": "^5.12.5",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.5"
+  }
+}
