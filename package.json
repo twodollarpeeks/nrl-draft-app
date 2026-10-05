@@ -21,13 +21,15 @@
     "db:generate": "npm run generate -w @nrl/db",
     "db:studio": "npm run studio -w @nrl/db",
     "nrl:import": "npm run import -w @nrl/nrl --",
-    "postinstall": "npm run generate -w @nrl/db"
+    "postinstall": "npm run generate -w @nrl/db",
+    "report:points": "tsx --env-file-if-exists=.env scripts/points-report.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "concurrently": "^10.0.5",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3",
-    "dotenv": "^18.0.5"
+    "dotenv": "^18.0.5",
+    "tsx": "^4.23.15"
   }
 }
