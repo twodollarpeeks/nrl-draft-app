@@ -97,6 +97,7 @@ needs a `DATABASE_URL` repository secret.
 | `BETTER_AUTH_SECRET` | server | Random string, 32+ characters; signs session cookies |
 | `BETTER_AUTH_URL` | server | The web app's origin (default `http://localhost:5173`) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | server | Google OAuth client (see below) |
+| `ADMIN_EMAILS` | server | Comma-separated emails of site admins (Profile → Player positions) |
 
 In the Neon console: project, **Connect**, **Show password**. Copy once with
 connection pooling on (`DATABASE_URL`) and once with it off (`DIRECT_URL`).
