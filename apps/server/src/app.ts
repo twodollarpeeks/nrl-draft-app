@@ -5,6 +5,8 @@ import type { PrismaClient } from "@nrl/db";
 import { registerAuthRoutes, sessionUserGetter, type Auth, type GetUser } from "./auth.ts";
 import type { Env } from "./env.ts";
 import { registerErrorHandler } from "./errors.ts";
+import { registerAdminRoutes } from "./admin/routes.ts";
+import { createGuards, parseAdminEmails } from "./guards.ts";
 import { registerLeagueRoutes } from "./leagues/routes.ts";
 
 export interface AppDeps {
@@ -33,7 +35,11 @@ export async function buildApp({ env, db, auth, getUser }: AppDeps) {
 
   if (auth) registerAuthRoutes(app, auth);
   const userGetter = getUser ?? (auth ? sessionUserGetter(auth) : null);
-  if (db && userGetter) registerLeagueRoutes(app, db, userGetter);
+  if (db && userGetter) {
+    const guards = createGuards(userGetter, parseAdminEmails(env.ADMIN_EMAILS));
+    registerLeagueRoutes(app, db, guards);
+    registerAdminRoutes(app, db, guards);
+  }
 
   return app;
 }

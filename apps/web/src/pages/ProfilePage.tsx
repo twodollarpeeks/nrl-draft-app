@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { AppShell } from "../components/Layout.tsx";
 import { Avatar, Button, Card, ErrorText, Field, inputClass } from "../components/ui.tsx";
 import { api } from "../lib/api.ts";
 import { authClient } from "../lib/auth.ts";
+import { useMe } from "../lib/queries.ts";
 
 export function ProfilePage() {
   const { data: session, refetch } = authClient.useSession();
+  const { data: me } = useMe();
   const navigate = useNavigate();
   const [name, setName] = useState(session?.user.name ?? "");
   const [error, setError] = useState<unknown>(null);
@@ -49,6 +51,14 @@ export function ProfilePage() {
         <ErrorText error={error} />
         <Button type="submit">{saved ? "Saved" : "Save"}</Button>
       </form>
+      {me?.isAdmin && (
+        <Card>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Site admin</div>
+          <Link to="/admin/players" className="font-medium text-accent">
+            Player positions →
+          </Link>
+        </Card>
+      )}
       <Button variant="secondary" onClick={signOut}>
         Sign out
       </Button>

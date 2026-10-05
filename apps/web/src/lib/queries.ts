@@ -4,6 +4,7 @@ import type {
   InvitePreview,
   LeagueDetail,
   LeagueSummary,
+  Me,
   UpdateLeagueInput,
 } from "@nrl/shared";
 import { api } from "./api.ts";
@@ -13,6 +14,8 @@ export const keys = {
   league: (id: string) => ["league", id] as const,
   invite: (code: string) => ["invite", code] as const,
 };
+
+export const useMe = () => useQuery({ queryKey: ["me"], queryFn: () => api<Me>("/api/me") });
 
 export const useMyLeagues = () =>
   useQuery({ queryKey: keys.leagues, queryFn: () => api<LeagueSummary[]>("/api/leagues") });

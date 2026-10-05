@@ -28,3 +28,12 @@ export const POSITION_LABELS: Record<NrlPosition, string> = {
   "2RF": "Second Row",
   LK: "Lock",
 };
+
+/** Positions a player can fill: an admin override wins over derived ones. */
+export function effectivePositions(p: {
+  positions: readonly string[];
+  positionsOverride: readonly string[];
+}): NrlPosition[] {
+  const list = p.positionsOverride.length > 0 ? p.positionsOverride : p.positions;
+  return list.filter((x): x is NrlPosition => (NRL_POSITIONS as readonly string[]).includes(x));
+}

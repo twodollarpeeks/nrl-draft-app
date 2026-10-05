@@ -12,6 +12,8 @@ const Env = z.object({
   BETTER_AUTH_SECRET: z.string().min(32).optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  // Comma-separated emails of site admins (can edit player positions etc.).
+  ADMIN_EMAILS: z.string().default(""),
 });
 export type Env = z.infer<typeof Env>;
 

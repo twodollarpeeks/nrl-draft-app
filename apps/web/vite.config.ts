@@ -6,6 +6,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
+    // Google sign-in redirects to :5173, so never silently move to another port.
+    strictPort: true,
     // In dev, the API and draft sockets are proxied so the browser sees one origin.
     proxy: {
       "/api": "http://localhost:3001",

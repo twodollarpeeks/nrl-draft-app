@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import "./index.css";
 import { RequireAuth } from "./components/Layout.tsx";
 import { ApiRequestError } from "./lib/api.ts";
+import { AdminPlayersPage } from "./pages/AdminPlayersPage.tsx";
 import { CreateLeaguePage } from "./pages/CreateLeaguePage.tsx";
 import { JoinPage } from "./pages/JoinPage.tsx";
 import { LeaguePage } from "./pages/LeaguePage.tsx";
@@ -36,6 +37,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/l/:id" element={authed(<LeaguePage />)} />
           <Route path="/l/:id/settings" element={authed(<LeagueSettingsPage />)} />
           <Route path="/profile" element={authed(<ProfilePage />)} />
+          <Route path="/admin/players" element={authed(<AdminPlayersPage />)} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

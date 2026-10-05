@@ -6,19 +6,12 @@ import {
   UpdateProfileInput,
 } from "@nrl/shared";
 import type { PrismaClient } from "@nrl/db";
-import type { FastifyInstance, FastifyRequest } from "fastify";
-import type { GetUser, SessionUser } from "../auth.ts";
-import { AppError } from "../errors.ts";
+import type { FastifyInstance } from "fastify";
+import type { Guards } from "../guards.ts";
 import { LeagueService } from "./service.ts";
 
-export function registerLeagueRoutes(app: FastifyInstance, db: PrismaClient, getUser: GetUser) {
+export function registerLeagueRoutes(app: FastifyInstance, db: PrismaClient, { requireUser }: Guards) {
   const leagues = new LeagueService(db);
-
-  async function requireUser(req: FastifyRequest): Promise<SessionUser> {
-    const user = await getUser(req);
-    if (!user) throw new AppError(401, "unauthenticated", "Please sign in");
-    return user;
-  }
 
   type IdParams = { Params: { id: string } };
   type CodeParams = { Params: { code: string } };
@@ -29,7 +22,7 @@ export function registerLeagueRoutes(app: FastifyInstance, db: PrismaClient, get
     const user = await requireUser(req);
     const { name } = UpdateProfileInput.parse(req.body);
     const updated = await db.user.update({ where: { id: user.id }, data: { name, updatedAt: new Date() } });
-    return { id: updated.id, name: updated.name, email: updated.email, image: updated.image };
+    return { ...user, name: updated.name };
   });
 
   app.get("/api/leagues", async (req) => leagues.listMine(await requireUser(req)));

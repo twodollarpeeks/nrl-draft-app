@@ -26,15 +26,20 @@ export function createAuth(env: Env, db: PrismaClient) {
 
 export type Auth = ReturnType<typeof createAuth>;
 
-export interface SessionUser {
+export interface AuthUser {
   id: string;
   name: string;
   email: string;
   image: string | null;
 }
 
+export interface SessionUser extends AuthUser {
+  /** Site admin: email listed in ADMIN_EMAILS. */
+  isAdmin: boolean;
+}
+
 /** Resolves the signed-in user for a request, or null. */
-export type GetUser = (req: FastifyRequest) => Promise<SessionUser | null>;
+export type GetUser = (req: FastifyRequest) => Promise<AuthUser | null>;
 
 export function headersFrom(req: FastifyRequest): Headers {
   const headers = new Headers();
