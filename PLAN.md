@@ -29,12 +29,25 @@ when a decision changes.
 
 ## Data sources
 
-- nrl.com has no JSON API for draw or match-centre data; stats are parsed from
-  server-rendered HTML with Playwright (approach proven in the Python
-  `nrl_stats_scraper.py`).
-- Historical per-match stats for 2020-2026 already exist as CSVs (one per
-  match). An importer loads them for seed data and pre-draft rankings.
-- Team lists: port the parser from the `nrl-team-lists` project.
+- nrl.com has no public JSON API, but every draw and match-centre page embeds
+  the JSON it was rendered from in a `q-data` attribute. The importer
+  (`packages/nrl`) fetches pages with plain `fetch` and parses that JSON. No
+  Playwright needed.
+- One match page gives the team list before kickoff and full player stats
+  after, with nrl.com's own player, club and match IDs. The draw gives UTC
+  kickoff times and byes.
+- nrl.com quirks handled: a cookie-less "browser" request is bounced through
+  a sign-in probe (avoided with `Accept: */*` and the `nrl_sso_probed`
+  cookie), and the stats' `goals` field is always 0 (goals = conversions +
+  penalty goals).
+- Positions: derived from where a player started in their latest season
+  (25%+ of starts or 3+ starts). Players who never start get the position
+  from their nrl.com profile.
+- Seed data: the 2026 season is backfilled from nrl.com. The old 2020-2026
+  CSVs aren't imported (no player IDs, so cross-season name matching would be
+  fragile).
+- Schedule: GitHub Actions runs `nrl:import --current` (current + previous
+  round) Tue/Wed for team lists and hourly on match days.
 
 ## Milestones
 

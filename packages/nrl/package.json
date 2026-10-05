@@ -1,0 +1,19 @@
+{
+  "name": "@nrl/nrl",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "import": "tsx --env-file-if-exists=../../.env src/cli.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@nrl/db": "*",
+    "@nrl/shared": "*",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.5"
+  }
+}

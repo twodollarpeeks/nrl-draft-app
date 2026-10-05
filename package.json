@@ -15,7 +15,13 @@
     "build": "npm run build -w @nrl/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:migrate": "npm run migrate -w @nrl/db",
+    "db:deploy": "npm run migrate:deploy -w @nrl/db",
+    "db:generate": "npm run generate -w @nrl/db",
+    "db:studio": "npm run studio -w @nrl/db",
+    "nrl:import": "npm run import -w @nrl/nrl --",
+    "postinstall": "npm run generate -w @nrl/db"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

@@ -1,0 +1,38 @@
+name: NRL import
+
+# Imports the current and previous round from nrl.com: team lists, kickoff
+# times, byes, and player stats. Re-runs are cheap: settled matches are skipped.
+# Requires the DATABASE_URL repository secret (Neon pooled connection string).
+
+on:
+  schedule:
+    # Team lists drop Tuesday ~4pm AEST: run Tue and Wed evenings (UTC).
+    - cron: "0 7 * * 2,3"
+    # Match days Thu-Mon: hourly from 03:00 to 13:00 UTC (1pm-11pm AEST).
+    - cron: "10 3-13 * * 0,1,4,5,6"
+  workflow_dispatch:
+    inputs:
+      args:
+        description: "Import arguments (default: --current)"
+        required: false
+        default: "--current"
+
+concurrency:
+  group: nrl-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run nrl:import -- $IMPORT_ARGS
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          IMPORT_ARGS: ${{ github.event.inputs.args || '--current' }}

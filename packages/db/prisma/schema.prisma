@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// NRL data. IDs for clubs, players and matches are nrl.com's own, so re-running
+// an import is a pure upsert and players keep their identity across seasons.
+// ---------------------------------------------------------------------------
+
+model Club {
+  id        Int    @id // nrl.com teamId
+  key       String @unique // nrl.com theme key, e.g. "sea-eagles"
+  nickName  String // "Sea Eagles"
+  name      String? // "Manly Warringah Sea Eagles"
+
+  homeMatches Match[]      @relation("HomeClub")
+  awayMatches Match[]      @relation("AwayClub")
+  appearances Appearance[]
+  players     Player[]
+}
+
+model Player {
+  id         Int      @id // nrl.com playerId
+  firstName  String
+  lastName   String
+  clubId     Int? // club of their most recent appearance
+  profileUrl String?
+  headImage  String?
+  // Positions this player can fill in fantasy (FB, WG, CE, FE, HB, HK, FRF,
+  // 2RF, LK), derived from where they started recently. An admin override, if
+  // set, replaces the derived list.
+  positions         String[]
+  positionsOverride String[]
+  // When we last looked up their nrl.com profile for a position (fallback for
+  // players who never start), so a missing profile isn't re-fetched every run.
+  profileCheckedAt  DateTime?
+  updatedAt         DateTime @updatedAt
+
+  club        Club?        @relation(fields: [clubId], references: [id])
+  appearances Appearance[]
+
+  @@index([lastName, firstName])
+}
+
+model Round {
+  id      String @id @default(cuid())
+  season  Int
+  number  Int // nrl.com round number: 1-27 regular season, 28-31 finals
+  title   String // "Round 5", "Finals Week 1", "Grand Final"
+  slug    String // URL segment: "round-5", "finals-week-1", "grand-final"
+  isFinals Boolean @default(false)
+  byeClubKeys String[] // Club.key of each club with a bye this round
+  lastImportedAt DateTime?
+
+  matches Match[]
+
+  @@unique([season, number])
+}
+
+model Match {
+  id         String   @id // nrl.com matchId, e.g. "20261110510"
+  roundId    String
+  homeClubId Int
+  awayClubId Int
+  kickoffAt  DateTime // UTC; lineups lock per player at this time
+  venue      String?
+  url        String   @unique
+  // nrl.com matchState: "Upcoming" | "Pre" | "FirstHalf" | "HalfTime" |
+  // "SecondHalf" | "FullTime" | ... stored verbatim.
+  state      String
+  homeScore  Int?
+  awayScore  Int?
+  // When nrl.com last changed this match's data (its "updated" field). Stats
+  // keep being corrected for days after full time; re-imports compare this.
+  sourceUpdatedAt DateTime?
+  lastFetchedAt   DateTime?
+
+  round       Round        @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  homeClub    Club         @relation("HomeClub", fields: [homeClubId], references: [id])
+  awayClub    Club         @relation("AwayClub", fields: [awayClubId], references: [id])
+  appearances Appearance[]
+
+  @@index([roundId])
+  @@index([kickoffAt])
+}
+
+// One named player in one match: the team list before kickoff, and the stats
+// after. A player named but not used (reserve, late withdrawal) has
+// minutes = 0 after full time, which is what triggers fantasy emergencies.
+model Appearance {
+  matchId       String
+  playerId      Int
+  clubId        Int
+  jersey        Int
+  positionLabel String // verbatim, e.g. "Five-Eighth", "Interchange", "Reserve"
+  isStarter     Boolean // jersey 1-13 in a named starting position
+
+  // Stats, null until the match has stats. The six scoring stats get their own
+  // columns; every stat nrl.com reports is kept in `stats` for future scoring.
+  minutes    Int?
+  runMetres  Int?
+  tackles    Int?
+  tries      Int?
+  tryAssists Int?
+  goals      Int?
+  errors     Int?
+  stats      Json?
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id])
+  club   Club   @relation(fields: [clubId], references: [id])
+
+  @@id([matchId, playerId])
+  @@index([playerId])
+}
+
+// Every distinct payload fetched from nrl.com, gzipped, so imports can be
+// replayed or re-normalised without hitting the site again. Identical
+// re-fetches are not stored twice.
+model RawScrape {
+  id          String   @id @default(cuid())
+  url         String
+  kind        String // "draw" | "match"
+  contentHash String
+  payloadGz   Bytes
+  fetchedAt   DateTime @default(now())
+
+  @@unique([url, contentHash])
+  @@index([url, fetchedAt])
+}
+
+model ImportRun {
+  id         String    @id @default(cuid())
+  season     Int
+  round      Int
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  status     String // "running" | "ok" | "error"
+  summary    Json?
+  error      String?
+
+  @@index([season, round, startedAt])
+}
