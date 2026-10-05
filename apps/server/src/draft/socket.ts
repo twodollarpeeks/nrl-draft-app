@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from "node:http";
 import { DRAFT_EVENTS, type DraftState } from "@nrl/shared";
 import { Server } from "socket.io";
+import { AppError } from "../errors.ts";
 import type { Guards } from "../guards.ts";
 import type { DraftEngine } from "./engine.ts";
 
@@ -38,8 +39,12 @@ export function attachDraftSockets(server: HttpServer, engine: DraftEngine, guar
         for (const room of socket.rooms) if (room.startsWith("draft:")) await socket.leave(room);
         await socket.join(roomFor(leagueId));
         socket.emit(DRAFT_EVENTS.state, state);
-      } catch {
-        socket.emit(DRAFT_EVENTS.error, { message: "You're not in this league" });
+      } catch (err) {
+        const notMember = err instanceof AppError && err.status === 404;
+        socket.emit(DRAFT_EVENTS.error, {
+          message: notMember ? "You're not in this league" : "Couldn't load the draft. Retrying…",
+          retry: !notMember,
+        });
       }
     });
   });

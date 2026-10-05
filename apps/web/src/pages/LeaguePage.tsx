@@ -15,6 +15,7 @@ export function LeaguePage() {
   const open = league.teamCount - league.teamsJoined;
   return (
     <AppShell title={league.name} back="/leagues">
+      <DraftCard league={league} />
       {league.status === "setup" && <InviteCard league={league} spotsLeft={open} />}
 
       <Card>
@@ -45,6 +46,36 @@ export function LeaguePage() {
 
       <SettingsSummary league={league} />
     </AppShell>
+  );
+}
+
+function DraftCard({ league }: { league: LeagueDetail }) {
+  const [title, hint] = {
+    setup: [
+      "Draft room",
+      league.isCommissioner
+        ? "Queue players, then start the draft when everyone's in."
+        : "Queue players before the draft starts.",
+    ],
+    drafting: ["The draft is live", "Jump in: the clock is running."],
+    inSeason: ["Draft results", "See who went where."],
+    complete: ["Draft results", "See who went where."],
+  }[league.status];
+  return (
+    <Link
+      to={`/l/${league.id}/draft`}
+      className={`flex items-center justify-between rounded-2xl border p-4 ${
+        league.status === "drafting" ? "border-accent bg-accent/10" : "border-border bg-surface hover:border-accent"
+      }`}
+    >
+      <div>
+        <div className="font-semibold">{title}</div>
+        <div className="text-sm text-muted">{hint}</div>
+      </div>
+      <span aria-hidden className="text-accent">
+        →
+      </span>
+    </Link>
   );
 }
 
