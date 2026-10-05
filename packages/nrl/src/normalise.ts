@@ -214,10 +214,18 @@ export function parseMatch(html: string): ParsedMatch {
   };
 }
 
-/** nrl.com player profile path, from the club-site URL in match data. */
-export function profilePath(clubKey: string, profileUrl: string): string | null {
-  const slug = profileUrl.replace(/\/+$/, "").split("/").pop();
-  return slug ? `/players/nrl-premiership/${clubKey}/${slug}/` : null;
+/**
+ * Candidate nrl.com profile paths for a player, best first. Match data links
+ * to profiles as /teams|players/nrl-premiership/<club-slug>/<player-slug>/ on
+ * nrl.com or a club site, where the club slug is usually the long name
+ * ("south-sydney-rabbitohs") but sometimes the short theme key ("dolphins").
+ */
+export function profilePaths(clubKey: string, profileUrl: string): string[] {
+  const m = profileUrl.match(/\/(?:teams|players)\/nrl-premiership\/([^/]+)\/([^/]+)\/?$/);
+  const slug = m?.[2] ?? profileUrl.replace(/\/+$/, "").split("/").pop();
+  if (!slug) return [];
+  const clubs = [m?.[1], clubKey].filter((c): c is string => !!c);
+  return [...new Set(clubs.map((c) => `/players/nrl-premiership/${c}/${slug}/`))];
 }
 
 function urlPath(url: string): string {

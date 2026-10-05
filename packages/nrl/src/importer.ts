@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import type { Prisma, PrismaClient } from "@nrl/db";
-import { PoliteFetcher, consoleLogger, type Logger } from "./http.ts";
+import { HttpError, PoliteFetcher, consoleLogger, type Logger } from "./http.ts";
 import {
   drawUrl,
   parseDraw,
   parseMatch,
-  profilePath,
+  profilePaths,
   type ParsedMatch,
 } from "./normalise.ts";
 import { extractProfilePosition } from "./qdata.ts";
@@ -243,19 +243,24 @@ export class NrlImporter {
 
     let filled = 0;
     for (const p of players) {
-      const path = p.club && p.profileUrl ? profilePath(p.club.key, p.profileUrl) : null;
+      const paths = p.club && p.profileUrl ? profilePaths(p.club.key, p.profileUrl) : [];
       let positions: string[] = [];
-      if (path) {
+      for (const path of paths) {
         try {
           const label = extractProfilePosition(await this.http.getText(path));
           const pos = label ? positionFromLabel(label) : null;
           if (pos) positions = [pos];
           else this.log.warn(`no usable position on profile ${path} (${label ?? "none"})`);
+          break;
         } catch (err) {
-          this.log.warn(`profile fetch failed for ${path}: ${(err as Error).message}`);
+          if (!(err instanceof HttpError && err.status === 404)) {
+            this.log.warn(`profile fetch failed for ${path}: ${(err as Error).message}`);
+            break;
+          }
         }
       }
       if (positions.length) filled++;
+      else this.log.warn(`no profile position for player ${p.id} (tried ${paths.join(", ") || "nothing"})`);
       await this.db.player.update({ where: { id: p.id }, data: { positions, profileCheckedAt: new Date() } });
     }
     this.log.info(`profile positions: ${players.length} fetched, ${filled} filled`);

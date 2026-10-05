@@ -8,7 +8,7 @@
   },
   "scripts": {
     "generate": "prisma generate",
-    "migrate": "prisma migrate dev",
+    "migrate": "prisma migrate dev && prisma generate",
     "migrate:deploy": "prisma migrate deploy",
     "studio": "prisma studio",
     "typecheck": "tsc -p tsconfig.json"

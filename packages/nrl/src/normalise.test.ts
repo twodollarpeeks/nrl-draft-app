@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCurrentRound, parseDraw, parseMatch, profilePath } from "./normalise.ts";
+import { parseCurrentRound, parseDraw, parseMatch, profilePaths } from "./normalise.ts";
 import { decodeHtmlEntities, extractProfilePosition } from "./qdata.ts";
 import { fixturePage } from "./testUtils.ts";
 
@@ -100,9 +100,18 @@ describe("helpers", () => {
     expect(extractProfilePosition(`<p>nothing</p>`)).toBeNull();
   });
 
-  it("builds an nrl.com profile path from a club-site URL", () => {
+  it("builds nrl.com profile paths from a club-site URL", () => {
     expect(
-      profilePath("dolphins", "https://www.dolphinsnrl.com.au/teams/nrl-premiership/dolphins/thomas-flegler/"),
-    ).toBe("/players/nrl-premiership/dolphins/thomas-flegler/");
+      profilePaths("dolphins", "https://www.dolphinsnrl.com.au/teams/nrl-premiership/dolphins/thomas-flegler/"),
+    ).toEqual(["/players/nrl-premiership/dolphins/thomas-flegler/"]);
+  });
+
+  it("tries the URL's long club slug before the short theme key", () => {
+    expect(
+      profilePaths("rabbitohs", "https://www.nrl.com/players/nrl-premiership/south-sydney-rabbitohs/liam-le-blanc/"),
+    ).toEqual([
+      "/players/nrl-premiership/south-sydney-rabbitohs/liam-le-blanc/",
+      "/players/nrl-premiership/rabbitohs/liam-le-blanc/",
+    ]);
   });
 });
