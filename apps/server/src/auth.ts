@@ -1,7 +1,8 @@
 import type { PrismaClient } from "@nrl/db";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { IncomingHttpHeaders } from "node:http";
+import type { FastifyInstance } from "fastify";
 import type { Env } from "./env.ts";
 
 export function createAuth(env: Env, db: PrismaClient) {
@@ -38,10 +39,15 @@ export interface SessionUser extends AuthUser {
   isAdmin: boolean;
 }
 
-/** Resolves the signed-in user for a request, or null. */
-export type GetUser = (req: FastifyRequest) => Promise<AuthUser | null>;
+/** Anything with request headers: a Fastify request or a socket handshake. */
+export interface HasHeaders {
+  headers: IncomingHttpHeaders;
+}
 
-export function headersFrom(req: FastifyRequest): Headers {
+/** Resolves the signed-in user for a request, or null. */
+export type GetUser = (req: HasHeaders) => Promise<AuthUser | null>;
+
+export function headersFrom(req: HasHeaders): Headers {
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
     if (value === undefined) continue;

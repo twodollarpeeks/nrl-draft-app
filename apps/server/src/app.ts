@@ -1,11 +1,14 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
-import { DEFAULT_LEAGUE_SETTINGS } from "@nrl/shared";
+import { DEFAULT_LEAGUE_SETTINGS, type DraftState } from "@nrl/shared";
 import type { PrismaClient } from "@nrl/db";
+import { registerAdminRoutes } from "./admin/routes.ts";
 import { registerAuthRoutes, sessionUserGetter, type Auth, type GetUser } from "./auth.ts";
+import { DraftEngine, type DraftEngineOptions } from "./draft/engine.ts";
+import { registerDraftRoutes } from "./draft/routes.ts";
+import { attachDraftSockets } from "./draft/socket.ts";
 import type { Env } from "./env.ts";
 import { registerErrorHandler } from "./errors.ts";
-import { registerAdminRoutes } from "./admin/routes.ts";
 import { createGuards, parseAdminEmails } from "./guards.ts";
 import { registerLeagueRoutes } from "./leagues/routes.ts";
 
@@ -15,17 +18,19 @@ export interface AppDeps {
   auth?: Auth;
   /** Overrides how the signed-in user is found (tests use a header). */
   getUser?: GetUser;
+  /** Draft engine options (tests inject a clock and timers). */
+  draft?: Omit<DraftEngineOptions, "onChange" | "log">;
+  /** Serve the draft room's sockets and run its clock (the real server). */
+  realtime?: boolean;
 }
 
-export async function buildApp({ env, db, auth, getUser }: AppDeps) {
+export async function buildApp({ env, db, auth, getUser, draft, realtime = false }: AppDeps) {
   const app = Fastify({
     logger: env.NODE_ENV === "test" ? false : { level: "info" },
   });
+  const origins = env.WEB_ORIGIN.split(",").map((o) => o.trim());
 
-  await app.register(cors, {
-    origin: env.WEB_ORIGIN.split(",").map((o) => o.trim()),
-    credentials: true,
-  });
+  await app.register(cors, { origin: origins, credentials: true });
   registerErrorHandler(app);
 
   // Also used to wake the free-tier host before a draft starts.
@@ -39,7 +44,31 @@ export async function buildApp({ env, db, auth, getUser }: AppDeps) {
     const guards = createGuards(userGetter, parseAdminEmails(env.ADMIN_EMAILS));
     registerLeagueRoutes(app, db, guards);
     registerAdminRoutes(app, db, guards);
+
+    let broadcast: (state: DraftState) => void = () => {};
+    const engine = new DraftEngine(db, { ...draft, onChange: (s) => broadcast(s), log: app.log });
+    registerDraftRoutes(app, engine, guards);
+    app.decorate("draftEngine", engine);
+
+    if (realtime) {
+      const sockets = attachDraftSockets(app.server, engine, guards, origins);
+      broadcast = sockets.broadcast;
+      app.addHook("onReady", async () => {
+        const n = await engine.recover();
+        if (n) app.log.info(`resumed the clock for ${n} live draft(s)`);
+      });
+      app.addHook("onClose", async () => {
+        await sockets.io.close();
+      });
+    }
+    app.addHook("onClose", async () => engine.shutdown());
   }
 
   return app;
+}
+
+declare module "fastify" {
+  interface FastifyInstance {
+    draftEngine?: DraftEngine;
+  }
 }

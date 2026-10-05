@@ -110,3 +110,80 @@ export interface Me {
   image: string | null;
   isAdmin: boolean;
 }
+
+// ---- Draft ------------------------------------------------------------------
+
+export const DRAFT_STATUSES = ["pending", "live", "paused", "complete"] as const;
+export type DraftStatus = (typeof DRAFT_STATUSES)[number];
+
+export interface DraftTeam {
+  id: string;
+  name: string;
+  ownerName: string;
+  ownerImage: string | null;
+}
+
+export interface DraftPickView {
+  pickNo: number;
+  round: number;
+  teamId: string;
+  playerId: number;
+  madeBy: "manager" | "autopick" | "commissioner";
+}
+
+/** Everything everyone in the draft room sees. Pushed over the socket on every change. */
+export interface DraftState {
+  leagueId: string;
+  status: DraftStatus;
+  pickSeconds: number;
+  /** Round-1 order (empty until the draft starts). */
+  order: DraftTeam[];
+  rounds: number;
+  totalPicks: number;
+  currentPick: number;
+  onClockTeamId: string | null;
+  /** ISO time the team on the clock gets autopicked. */
+  deadline: string | null;
+  pausedRemainingMs: number | null;
+  picks: DraftPickView[];
+  autopilotTeamIds: string[];
+  version: number;
+  /** Server time when this state was sent, to correct for clock skew. */
+  serverNow: string;
+}
+
+/** A player in the draft pool, ranked for best-available and autopick. */
+export interface DraftPlayer {
+  id: number;
+  name: string;
+  club: { key: string; nickName: string } | null;
+  positions: NrlPosition[];
+  /** Season the ranking is based on. */
+  statsSeason: number;
+  games: number;
+  /** Average points per game under this league's scoring. */
+  avgPoints: number;
+  rank: number;
+}
+
+export const MakePickInput = z.object({
+  /** The pick the client thinks is on the clock; stale picks are rejected. */
+  pickNo: z.number().int().min(1),
+  playerId: z.number().int(),
+});
+export type MakePickInput = z.infer<typeof MakePickInput>;
+
+export const SetQueueInput = z.object({
+  playerIds: z.array(z.number().int()).max(200),
+});
+
+export const SetAutopilotInput = z.object({ on: z.boolean() });
+
+export const DRAFT_EVENTS = {
+  /** client -> server: { leagueId } */
+  join: "draft:join",
+  /** server -> client: DraftState */
+  state: "draft:state",
+  /** server -> client: { message } when a join is refused */
+  error: "draft:error",
+} as const;

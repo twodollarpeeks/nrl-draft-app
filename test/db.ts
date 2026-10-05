@@ -16,7 +16,12 @@ config({ path: fileURLToPath(new URL("../.env", import.meta.url)), quiet: true }
 export const hasTestDb = Boolean(process.env.DATABASE_URL && process.env.DIRECT_URL);
 
 export function testDb(): PrismaClient {
-  return createPrisma({ schema: TEST_SCHEMA });
+  // Prisma qualifies its own queries with the schema; search_path makes raw
+  // SQL (which names tables unqualified) land in the test schema too. Uses
+  // the direct connection: the pooler doesn't accept startup options.
+  const url = new URL(process.env.DIRECT_URL!);
+  url.searchParams.set("options", `-c search_path=${TEST_SCHEMA}`);
+  return createPrisma({ connectionString: url.toString(), schema: TEST_SCHEMA });
 }
 
 /** Empty every table in the test schema. */

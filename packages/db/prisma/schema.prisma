@@ -40,8 +40,11 @@ model Player {
   profileCheckedAt  DateTime?
   updatedAt         DateTime @updatedAt
 
-  club        Club?        @relation(fields: [clubId], references: [id])
+  club        Club?            @relation(fields: [clubId], references: [id])
   appearances Appearance[]
+  draftPicks  DraftPick[]
+  queuedIn    DraftQueueItem[]
+  rosterSpots RosterEntry[]
 
   @@index([lastName, firstName])
 }
@@ -231,9 +234,11 @@ model League {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  commissioner User       @relation("Commissioner", fields: [commissionerId], references: [id])
+  commissioner User          @relation("Commissioner", fields: [commissionerId], references: [id])
   teams        Team[]
   auditLog     AuditLog[]
+  draft        Draft?
+  roster       RosterEntry[]
 }
 
 // A user's team in a league. Also the league membership: one team per user
@@ -245,8 +250,11 @@ model Team {
   name      String
   createdAt DateTime @default(now())
 
-  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  owner  User   @relation(fields: [ownerId], references: [id])
+  league     League           @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  owner      User             @relation(fields: [ownerId], references: [id])
+  draftPicks DraftPick[]
+  queue      DraftQueueItem[]
+  roster     RosterEntry[]
 
   @@unique([leagueId, ownerId])
   @@unique([leagueId, name])
@@ -266,4 +274,96 @@ model AuditLog {
   actor  User?  @relation(fields: [actorId], references: [id])
 
   @@index([leagueId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Draft
+// ---------------------------------------------------------------------------
+
+// One draft per league. The server owns the clock: `deadline` is when the
+// team on the clock gets autopicked. Every change bumps `version`, which is
+// also how a change takes the row lock that serialises picks.
+model Draft {
+  id                String    @id @default(cuid())
+  leagueId          String    @unique
+  type              String    @default("snake")
+  // "live" | "paused" | "complete"
+  status            String
+  pickSeconds       Int
+  // Team ids in round-1 order; snake reverses it every other round.
+  order             String[]
+  totalPicks        Int
+  // 1-based overall pick number now on the clock (totalPicks + 1 when done).
+  currentPick       Int       @default(1)
+  deadline          DateTime?
+  // While paused: how long the team on the clock had left.
+  pausedRemainingMs Int?
+  // Teams that missed a pick and now pick automatically until they opt out.
+  autopilotTeamIds  String[]
+  version           Int       @default(0)
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+
+  league League           @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  picks  DraftPick[]
+  queue  DraftQueueItem[]
+
+  @@index([status])
+}
+
+model DraftPick {
+  id        String   @id @default(cuid())
+  draftId   String
+  pickNo    Int
+  round     Int
+  teamId    String
+  playerId  Int
+  // "manager" | "autopick" | "commissioner"
+  madeBy    String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  draft  Draft  @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id])
+
+  // The database itself refuses a second pick in the same slot, or the same
+  // player twice, whatever happens in application code.
+  @@unique([draftId, pickNo])
+  @@unique([draftId, playerId])
+}
+
+// Each manager's private pre-draft wishlist, in order.
+model DraftQueueItem {
+  draftId  String
+  teamId   String
+  playerId Int
+  rank     Int
+
+  draft  Draft  @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@id([draftId, teamId, playerId])
+  @@index([draftId, teamId, rank])
+}
+
+// Who owns which player in a league. Drafting creates entries; waivers and
+// trades will end one (releasedAt) and start another. A player can have only
+// one current entry per league (partial unique index in the migration).
+model RosterEntry {
+  id          String    @id @default(cuid())
+  leagueId    String
+  teamId      String
+  playerId    Int
+  acquiredVia String // "draft" (later: "waiver", "trade", "freeAgent")
+  acquiredAt  DateTime  @default(now())
+  releasedAt  DateTime?
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@index([teamId])
+  @@index([leagueId, playerId])
 }

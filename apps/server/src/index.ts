@@ -9,7 +9,7 @@ const auth = createAuth(env, db);
 if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
   console.warn("GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set: Google sign-in is disabled");
 }
-const app = await buildApp({ env, db, auth });
+const app = await buildApp({ env, db, auth, realtime: true });
 
 try {
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
