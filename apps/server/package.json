@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
+    "@nrl/db": "*",
     "@nrl/shared": "*",
+    "better-auth": "^1.7.7",
     "fastify": "^5.12.5",
     "tsx": "^4.23.15",
     "zod": "^4.6.5"

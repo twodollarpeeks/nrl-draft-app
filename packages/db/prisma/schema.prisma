@@ -145,3 +145,125 @@ model ImportRun {
 
   @@index([season, round, startedAt])
 }
+
+// ---------------------------------------------------------------------------
+// Auth (Better Auth's tables; field names must match what it expects)
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+
+  sessions        Session[]
+  accounts        Account[]
+  teams           Team[]
+  leaguesRun      League[]   @relation("Commissioner")
+  auditLogEntries AuditLog[]
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime
+  updatedAt  DateTime
+
+  @@index([identifier])
+}
+
+// ---------------------------------------------------------------------------
+// Leagues
+// ---------------------------------------------------------------------------
+
+model League {
+  id             String   @id @default(cuid())
+  name           String
+  season         Int // NRL season the league plays, e.g. 2027
+  commissionerId String
+  // "private" (invite link only) now; "public" later.
+  visibility     String   @default("private")
+  inviteCode     String   @unique
+  // "setup" -> "drafting" -> "inSeason" -> "complete"
+  status         String   @default("setup")
+  // LeagueSettings from @nrl/shared, validated with zod on every write.
+  settings       Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  commissioner User       @relation("Commissioner", fields: [commissionerId], references: [id])
+  teams        Team[]
+  auditLog     AuditLog[]
+}
+
+// A user's team in a league. Also the league membership: one team per user
+// per league.
+model Team {
+  id        String   @id @default(cuid())
+  leagueId  String
+  ownerId   String
+  name      String
+  createdAt DateTime @default(now())
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  owner  User   @relation(fields: [ownerId], references: [id])
+
+  @@unique([leagueId, ownerId])
+  @@unique([leagueId, name])
+}
+
+// Every commissioner action and notable league event. Feeds the activity
+// feed later.
+model AuditLog {
+  id        String   @id @default(cuid())
+  leagueId  String
+  actorId   String?
+  action    String // e.g. "league.create", "team.join", "settings.update"
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  actor  User?  @relation(fields: [actorId], references: [id])
+
+  @@index([leagueId, createdAt])
+}

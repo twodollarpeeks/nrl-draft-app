@@ -10,7 +10,7 @@ See [PLAN.md](PLAN.md) for the agreed design and milestones.
 | Path | What |
 |---|---|
 | `apps/web` | Vite + React + TypeScript + Tailwind frontend (mobile-first, dark) |
-| `apps/server` | Fastify API and (soon) Socket.io draft server |
+| `apps/server` | Fastify API: auth (Better Auth + Google), leagues, invites (Socket.io draft server next) |
 | `packages/shared` | Shared types and zod schemas: positions, league settings, defaults |
 | `packages/db` | Prisma schema, migrations and client (Postgres on Neon) |
 | `packages/nrl` | nrl.com importer: draw, team lists, player stats, positions |
@@ -94,6 +94,35 @@ needs a `DATABASE_URL` repository secret.
 | `DIRECT_URL` | migrations | Neon **direct** connection string (no `-pooler`) |
 | `PORT` | server | API port (default 3001) |
 | `WEB_ORIGIN` | server | Comma-separated origins allowed by CORS (default `http://localhost:5173`) |
+| `BETTER_AUTH_SECRET` | server | Random string, 32+ characters; signs session cookies |
+| `BETTER_AUTH_URL` | server | The web app's origin (default `http://localhost:5173`) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | server | Google OAuth client (see below) |
 
 In the Neon console: project, **Connect**, **Show password**. Copy once with
 connection pooling on (`DATABASE_URL`) and once with it off (`DIRECT_URL`).
+
+Generate a `BETTER_AUTH_SECRET` with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+### Google sign-in
+
+In the [Google Cloud console](https://console.cloud.google.com): create a
+project, then under **Google Auth Platform** set up the consent screen
+(External; keep it in Testing and add your friends as test users), then
+**Clients → Create client → Web application** with:
+
+- Authorised JavaScript origin: `http://localhost:5173`
+- Authorised redirect URI: `http://localhost:5173/api/auth/callback/google`
+
+Add the production web origin and `<origin>/api/auth/callback/google` when
+deploying.
+
+## Tests
+
+`npm test` runs everything. Tests that need a database run against a separate
+`test` Postgres schema (created and migrated automatically from
+`DIRECT_URL`), never the real data in `public`. Without `DATABASE_URL` and
+`DIRECT_URL` they're skipped.
