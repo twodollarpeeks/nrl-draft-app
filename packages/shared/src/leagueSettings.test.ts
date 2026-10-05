@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_LEAGUE_SETTINGS,
+  seasonRounds,
   DEFAULT_ROSTER_TEMPLATE,
   LeagueSettings,
   RosterTemplate,
@@ -18,7 +19,7 @@ describe("league settings", () => {
     expect(squadSize(DEFAULT_ROSTER_TEMPLATE)).toBe(14);
   });
 
-  it("five-eighths fill the HB/HK slot, not OB", () => {
+  it("five-eighths fill the HF/HK slot, not OB", () => {
     const slot = (key: string) =>
       DEFAULT_ROSTER_TEMPLATE.slots.find((s) => s.key === key)!;
     expect(slot("HB_HK").eligible).toContain("FE");
@@ -38,5 +39,28 @@ describe("league settings", () => {
       const r = LeagueSettings.safeParse({ ...DEFAULT_LEAGUE_SETTINGS, teamCount });
       expect(r.success).toBe(false);
     }
+  });
+
+  it("old leagues without a season end run the full NRL season", () => {
+    const { seasonEndRound: _drop, ...old } = DEFAULT_LEAGUE_SETTINGS;
+    expect(LeagueSettings.parse(old).seasonEndRound).toBe(27);
+  });
+
+  it("only allows season ends between rounds 12 and 27", () => {
+    for (const r of [11, 28]) {
+      expect(LeagueSettings.safeParse({ ...DEFAULT_LEAGUE_SETTINGS, seasonEndRound: r }).success).toBe(false);
+    }
+  });
+});
+
+describe("seasonRounds", () => {
+  it("puts top-4 finals in the last two rounds, ending at the chosen grand final", () => {
+    expect(seasonRounds(27, DEFAULT_LEAGUE_SETTINGS.matchups)).toEqual({ lastRegularRound: 25, semiFinalRound: 26, grandFinalRound: 27 });
+    expect(seasonRounds(24, DEFAULT_LEAGUE_SETTINGS.matchups)).toEqual({ lastRegularRound: 22, semiFinalRound: 23, grandFinalRound: 24 });
+  });
+
+  it("ends the regular season at the chosen round without finals", () => {
+    expect(seasonRounds(25, { mode: "totalPoints" })).toEqual({ lastRegularRound: 25, semiFinalRound: null, grandFinalRound: null });
+    expect(seasonRounds(25, { mode: "headToHead", finalsTeams: 0, tiebreakers: [] }).lastRegularRound).toBe(25);
   });
 });

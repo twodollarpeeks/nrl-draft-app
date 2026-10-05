@@ -1,8 +1,6 @@
 // Top-4 finals: semi-finals 1v4 and 2v3, then a grand final. A drawn final is
 // won by the higher seed (it finished higher on the ladder).
 
-export const FINALS_ROUNDS = 2;
-
 export interface FinalsGame<T> {
   stage: "semi" | "grandFinal";
   /** Higher seed first. Null until the semis are decided. */
@@ -15,11 +13,6 @@ export interface FinalsBracket<T> {
   semis: [FinalsGame<T>, FinalsGame<T>];
   grandFinal: FinalsGame<T>;
   champion: T | null;
-}
-
-/** The last regular-season round when the season has `seasonRounds` rounds. */
-export function lastRegularRound(seasonRounds: number, finalsTeams: 0 | 4): number {
-  return finalsTeams === 4 ? seasonRounds - FINALS_ROUNDS : seasonRounds;
 }
 
 /**

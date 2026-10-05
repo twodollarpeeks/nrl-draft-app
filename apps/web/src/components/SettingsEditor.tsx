@@ -1,6 +1,9 @@
 import {
   MAX_TEAMS,
   MIN_TEAMS,
+  MIN_SEASON_END_ROUND,
+  NRL_LAST_ROUND,
+  seasonRounds,
   squadSize,
   type CommissionerPermissions,
   type LeagueSettings,
@@ -118,6 +121,7 @@ export function SettingsEditor({
               </label>
             ))}
           </fieldset>
+          <SeasonEnd value={value} disabled={!can.format} onChange={(seasonEndRound) => set("seasonEndRound", seasonEndRound)} />
         </div>
       </Card>
 
@@ -170,10 +174,51 @@ export function SettingsEditor({
             onChange={(scoring) => set("scoring", scoring)}
             canEdit={(stat) => allowedStats.has(stat)}
             lockedNote={LOCKED}
+            hideLockedZero
           />
         )}
       </Card>
     </>
+  );
+}
+
+/** Which round the fantasy season finishes in (the grand final, with finals). */
+function SeasonEnd({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: LeagueSettings;
+  disabled: boolean;
+  onChange: (round: number) => void;
+}) {
+  const r = seasonRounds(value.seasonEndRound, value.matchups);
+  const hint = r.grandFinalRound
+    ? `Regular season rounds 1–${r.lastRegularRound}, semi-finals round ${r.semiFinalRound}, grand final round ${r.grandFinalRound}`
+    : `Rounds 1–${r.lastRegularRound}`;
+  const rounds = Array.from({ length: NRL_LAST_ROUND - MIN_SEASON_END_ROUND + 1 }, (_, i) => NRL_LAST_ROUND - i);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">{r.grandFinalRound ? "Grand final in" : "Season ends after"}</span>
+        <select
+          className={inputClass}
+          value={value.seasonEndRound}
+          disabled={disabled}
+          onChange={(e) => onChange(Number(e.target.value))}
+        >
+          {rounds.map((n) => (
+            <option key={n} value={n}>
+              Round {n}
+              {n === NRL_LAST_ROUND ? " (last NRL round)" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className="text-xs text-muted">
+        {hint}. Clubs heading for the NRL finals often rest players late in the season, so you can finish early.
+      </span>
+    </div>
   );
 }
 

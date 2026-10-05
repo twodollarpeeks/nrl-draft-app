@@ -61,3 +61,11 @@ export const useRenameTeam = () =>
 /** New-league defaults and what this user may change (site admin settings). */
 export const useLeagueDefaults = () =>
   useQuery({ queryKey: ["league-defaults"], queryFn: () => api<LeagueDefaults>("/api/league-defaults") });
+
+export const useSetDraftOrder = (id: string) =>
+  useLeagueMutation((teamIds: string[]) =>
+    api<LeagueDetail>(`/api/leagues/${id}/draft-order`, { method: "PUT", body: { teamIds } }),
+  );
+
+export const useRandomiseDraftOrder = (id: string) =>
+  useLeagueMutation(() => api<LeagueDetail>(`/api/leagues/${id}/draft-order/randomise`, { method: "POST" }));

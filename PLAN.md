@@ -7,13 +7,17 @@ when a decision changes.
 
 - **Draft:** snake only for MVP (auction later, schema leaves room). No
   third-round reversal. Default pick timer 60s, configurable per league.
+  Commissioners can set a draft date/time (editable until it starts); the
+  server starts the draft at that time, even after a restart. Draft order:
+  "randomise & lock when the league is full" (default) or set manually by the
+  commissioner (arrange or shuffle until the draft).
 - **Autopick:** queue first, then best available player who fits an open
   slot. A team that misses a pick stays on autopilot until its manager turns
   it off.
-- **Squad (default, commissioner-editable):** 1 HB/HK (HB, FE, HK), 3 FWD
+- **Squad (default, commissioner-editable):** 1 HF/HK (HB, FE, HK), 3 FWD
   (FRF, 2RF, LK), 3 OB (FB, WG, CE), 1 Flex (any), 6 bench. Only starters
   score.
-- **Scoring:** any of ~48 nrl.com stats (catalogue in packages/shared). Site
+- **Scoring:** any of 46 nrl.com stats (not minutes played or match points) (catalogue in packages/shared). Site
   default (admin panel → Scoring & permissions) starts at run metres 0.1/m,
   tackles 0.25, tries 8, try assists 4, goals 2, errors -4: the balanced set
   from the 2026 analysis. New leagues copy the site default; existing leagues
@@ -23,8 +27,10 @@ when a decision changes.
 - **Non-playing starters:** ordered emergencies. The first bench player in the
   manager's emergency order who is eligible for the slot and played comes in.
 - **Lineup lock:** per player at their match's kickoff.
-- **Leagues:** 4-12 teams, default 8. Head-to-head with top-4 finals (semis
-  round 26, grand final round 27) or a total-points ladder.
+- **Leagues:** 4-12 teams, default 8. Head-to-head with top-4 finals or no
+  finals, or a total-points ladder. Commissioners choose the round the season
+  ends (12-27, default 27), because playoff-bound clubs rest players late: the
+  grand final with finals (semis the round before), otherwise the last round.
 - **Ladder ties:** wins (draw = half), points for, head-to-head, points against.
 - **Ownership:** a player is on at most one team per league; a user can be in
   many leagues.

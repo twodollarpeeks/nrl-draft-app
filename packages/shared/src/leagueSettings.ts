@@ -39,7 +39,8 @@ export function squadSize(t: RosterTemplate): number {
 
 export const DEFAULT_ROSTER_TEMPLATE: RosterTemplate = {
   slots: [
-    { key: "HB_HK", label: "HB/HK", count: 1, eligible: ["HB", "FE", "HK"] },
+    // Halves (halfback, five-eighth) and hookers.
+    { key: "HB_HK", label: "HF/HK", count: 1, eligible: ["HB", "FE", "HK"] },
     { key: "FWD", label: "Forward", count: 3, eligible: ["FRF", "2RF", "LK"] },
     { key: "OB", label: "Outside Back", count: 3, eligible: ["FB", "WG", "CE"] },
     { key: "FLEX", label: "Flex", count: 1, eligible: [...NRL_POSITIONS] },
@@ -111,6 +112,31 @@ export const DEFAULT_MATCHUPS: MatchupSettings = {
   tiebreakers: ["pointsFor", "headToHead", "pointsAgainst"],
 };
 
+// ---- Season length ----------------------------------------------------------
+
+/** The NRL regular season's last round. Fantasy can't go past it: NRL finals involve too few clubs. */
+export const NRL_LAST_ROUND = 27;
+/** Shortest fantasy season allowed, so there's a real regular season before any finals. */
+export const MIN_SEASON_END_ROUND = 12;
+/** Top-4 finals take two rounds: semi-finals, then the grand final. */
+export const FINALS_ROUNDS = 2;
+
+export const SeasonEndRound = z.number().int().min(MIN_SEASON_END_ROUND).max(NRL_LAST_ROUND);
+
+/**
+ * The fantasy season's rounds. Playoff-bound NRL clubs rest players late in
+ * the season, so leagues can finish early. `endRound` is the grand final for
+ * head-to-head with finals, otherwise the final round.
+ */
+export function seasonRounds(endRound: number, matchups: MatchupSettings) {
+  const finals = matchups.mode === "headToHead" && matchups.finalsTeams === 4;
+  return {
+    lastRegularRound: finals ? endRound - FINALS_ROUNDS : endRound,
+    semiFinalRound: finals ? endRound - 1 : null,
+    grandFinalRound: finals ? endRound : null,
+  };
+}
+
 // ---- Whole league -------------------------------------------------------------
 
 export const MIN_TEAMS = 4;
@@ -122,6 +148,8 @@ export const LeagueSettings = z.object({
   scoring: ScoringRules,
   draft: DraftSettings,
   matchups: MatchupSettings,
+  // Leagues created before this setting existed ran the full season.
+  seasonEndRound: SeasonEndRound.default(NRL_LAST_ROUND),
 });
 export type LeagueSettings = z.infer<typeof LeagueSettings>;
 
@@ -131,4 +159,5 @@ export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
   scoring: DEFAULT_SCORING,
   draft: DEFAULT_DRAFT,
   matchups: DEFAULT_MATCHUPS,
+  seasonEndRound: NRL_LAST_ROUND,
 };

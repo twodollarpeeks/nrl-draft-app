@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { LeagueName, LeagueSettings, type LeagueDefaults } from "@nrl/shared";
+import { LeagueName, LeagueSettings, type DraftOrderMode, type LeagueDefaults } from "@nrl/shared";
+import { DraftScheduleFields } from "../components/DraftSetup.tsx";
 import { AppShell } from "../components/Layout.tsx";
 import { SettingsEditor } from "../components/SettingsEditor.tsx";
-import { Button, Card, ErrorText, Field, Spinner, inputClass } from "../components/ui.tsx";
+import { Button, Card, ErrorText, Field, SectionTitle, Spinner, inputClass } from "../components/ui.tsx";
 import { useCreateLeague, useLeagueDefaults } from "../lib/queries.ts";
 
 // Leagues play the upcoming season; the one just finished is available for
@@ -30,6 +31,8 @@ function CreateLeagueForm({ defaults }: { defaults: LeagueDefaults }) {
   const [season, setSeason] = useState(SEASONS[0]!);
   const [teamName, setTeamName] = useState("");
   const [settings, setSettings] = useState<LeagueSettings>(defaults.settings);
+  const [draftAt, setDraftAt] = useState<string | null>(null);
+  const [orderMode, setOrderMode] = useState<DraftOrderMode>("randomWhenFull");
   const [formError, setFormError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
@@ -43,6 +46,8 @@ function CreateLeagueForm({ defaults }: { defaults: LeagueDefaults }) {
       name: nameCheck.data,
       season,
       settings: settingsCheck.data,
+      draftAt,
+      draftOrderMode: orderMode,
       ...(teamName.trim() ? { teamName: teamName.trim() } : {}),
     });
     navigate(`/l/${league.id}`);
@@ -68,6 +73,11 @@ function CreateLeagueForm({ defaults }: { defaults: LeagueDefaults }) {
               ))}
             </select>
           </Field>
+        </Card>
+
+        <Card>
+          <SectionTitle>Draft</SectionTitle>
+          <DraftScheduleFields draftAt={draftAt} onDraftAt={setDraftAt} mode={orderMode} onMode={setOrderMode} />
         </Card>
 
         <SettingsEditor value={settings} onChange={setSettings} limits={defaults} />

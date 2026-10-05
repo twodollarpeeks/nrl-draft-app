@@ -1,10 +1,18 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
-import { LeagueName, LeagueSettings, type LeagueDetail } from "@nrl/shared";
+import { LeagueName, LeagueSettings, type DraftOrderMode, type LeagueDetail } from "@nrl/shared";
+import { DraftOrderList, DraftScheduleFields } from "../components/DraftSetup.tsx";
 import { AppShell } from "../components/Layout.tsx";
 import { SettingsEditor, type SettingsLimits } from "../components/SettingsEditor.tsx";
 import { Button, Card, ErrorText, Field, SectionTitle, Spinner, inputClass } from "../components/ui.tsx";
-import { useLeague, useLeagueDefaults, useResetInvite, useUpdateLeague } from "../lib/queries.ts";
+import {
+  useLeague,
+  useLeagueDefaults,
+  useRandomiseDraftOrder,
+  useResetInvite,
+  useSetDraftOrder,
+  useUpdateLeague,
+} from "../lib/queries.ts";
 
 export function LeagueSettingsPage() {
   const { id = "" } = useParams();
@@ -22,6 +30,10 @@ function SettingsForm({ league, limits }: { league: LeagueDetail; limits: Settin
   const resetInvite = useResetInvite(league.id);
   const [name, setName] = useState(league.name);
   const [settings, setSettings] = useState<LeagueSettings>(league.settings);
+  const [draftAt, setDraftAt] = useState<string | null>(league.draftAt);
+  const [orderMode, setOrderMode] = useState<DraftOrderMode>(league.draftOrderMode);
+  const setOrder = useSetDraftOrder(league.id);
+  const randomise = useRandomiseDraftOrder(league.id);
   const [formError, setFormError] = useState<string | null>(null);
   const locked = league.status !== "setup";
 
@@ -32,7 +44,16 @@ function SettingsForm({ league, limits }: { league: LeagueDetail; limits: Settin
     const settingsCheck = LeagueSettings.safeParse(settings);
     if (!settingsCheck.success) return setFormError(settingsCheck.error.issues[0]?.message ?? "Check the settings");
     setFormError(null);
-    await update.mutateAsync({ name: nameCheck.data, ...(locked ? {} : { settings: settingsCheck.data }) });
+    await update.mutateAsync({
+      name: nameCheck.data,
+      ...(locked
+        ? {}
+        : {
+            settings: settingsCheck.data,
+            ...(draftAt !== league.draftAt ? { draftAt } : {}),
+            ...(orderMode !== league.draftOrderMode ? { draftOrderMode: orderMode } : {}),
+          }),
+    });
     navigate(`/l/${league.id}`);
   }
 
@@ -50,7 +71,34 @@ function SettingsForm({ league, limits }: { league: LeagueDetail; limits: Settin
             <p className="text-sm text-muted">Rules are locked once the draft has started.</p>
           </Card>
         ) : (
-          <SettingsEditor value={settings} onChange={setSettings} minTeams={league.teamsJoined} limits={limits} />
+          <>
+            <Card className="flex flex-col gap-4">
+              <SectionTitle>Draft</SectionTitle>
+              <DraftScheduleFields
+                draftAt={draftAt}
+                onDraftAt={setDraftAt}
+                mode={orderMode}
+                onMode={setOrderMode}
+                orderLocked={league.draftOrderLocked}
+              />
+              {/* Arranging applies straight away; the mode switch above saves with the form. */}
+              {league.draftOrderMode === "manual" && orderMode === "manual" && (
+                <DraftOrderList
+                  league={league}
+                  editable
+                  onChange={(ids) => setOrder.mutate(ids)}
+                  onRandomise={() => randomise.mutate()}
+                  busy={setOrder.isPending || randomise.isPending}
+                  error={setOrder.error ?? randomise.error}
+                />
+              )}
+              {league.draftOrderLocked && <DraftOrderList league={league} />}
+              {orderMode === "manual" && league.draftOrderMode !== "manual" && (
+                <p className="text-sm text-muted">Save to start arranging the order.</p>
+              )}
+            </Card>
+            <SettingsEditor value={settings} onChange={setSettings} minTeams={league.teamsJoined} limits={limits} />
+          </>
         )}
 
         <ErrorText error={formError ?? update.error} />

@@ -60,7 +60,7 @@ export interface TeamRoundScore {
  * Score a team's round. Only starters score. A starter who doesn't play is
  * replaced by the first bench player, in emergency order, who is eligible for
  * that slot, played, and hasn't already replaced someone. Slots are filled in
- * template order (e.g. HB/HK, then FWD, OB, FLEX).
+ * template order (e.g. HF/HK, then FWD, OB, FLEX).
  *
  * While an emergency ahead in the order is still pending, we can't know
  * whether they'll play, so the slot scores 0 for now and the result is

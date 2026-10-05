@@ -28,6 +28,8 @@ export interface DraftEngineOptions {
   /** Called after every committed change, with the new public state. */
   onChange?: (state: DraftState) => void;
   timers?: DraftTimers;
+  /** Timers for scheduled draft starts (keyed by league id). */
+  startTimers?: DraftTimers;
   log?: { error(obj: unknown, msg?: string): void; info(obj: unknown, msg?: string): void };
 }
 
@@ -41,6 +43,7 @@ export interface DraftEngineOptions {
 export class DraftEngine {
   private readonly now: () => Date;
   private readonly timers: DraftTimers;
+  private readonly startTimers: DraftTimers;
   private readonly rankings = new Map<string, { at: number; players: DraftPlayer[] }>();
 
   constructor(
@@ -54,6 +57,9 @@ export class DraftEngine {
         (draftId, pickNo) => void this.autopickIfDue(draftId, pickNo),
         () => this.now().getTime(),
       );
+    this.startTimers =
+      opts.startTimers ??
+      new DraftTimers((leagueId) => void this.autoStartIfDue(leagueId), () => this.now().getTime());
   }
 
   // ---- Reads --------------------------------------------------------------
@@ -142,9 +148,20 @@ export class DraftEngine {
 
   // ---- Commissioner actions -----------------------------------------------
 
-  async start(user: SessionUser, leagueId: string, shuffle: (teamIds: string[]) => string[] = shuffleArray): Promise<DraftState> {
+  async start(user: SessionUser, leagueId: string): Promise<DraftState> {
     const league = await this.leagueWithSettings(leagueId);
     this.requireCommissioner(user, league);
+    await this.startDraft(leagueId, user.id);
+    return this.publicState(leagueId);
+  }
+
+  /**
+   * Start the draft. The round-1 order is the league's own (set by the
+   * commissioner, or drawn when the league filled) if it covers exactly the
+   * teams in the league, otherwise it's drawn now.
+   */
+  private async startDraft(leagueId: string, actorId: string | null) {
+    const league = await this.leagueWithSettings(leagueId);
     if (league.teams.length < 2) throw conflict("not_enough_teams", "You need at least 2 teams to draft");
     if ((await this.rankedPlayers(leagueId)).length === 0) {
       throw conflict("no_players", "There's no player data for this season yet");
@@ -152,11 +169,14 @@ export class DraftEngine {
 
     await this.mutate(leagueId, async (tx, draft) => {
       if (draft.status !== "pending") throw conflict("draft_started", "The draft has already started");
-      const order = shuffle(league.teams.map((t) => t.id));
+      const teamIds = league.teams.map((t) => t.id);
+      const stored = league.draftOrder;
+      const usable = stored.length === teamIds.length && teamIds.every((id) => stored.includes(id));
+      const order = usable ? stored : shuffleArray(teamIds);
       const settings = { ...league.settings, teamCount: order.length };
       // Lock in the league: its size is whoever joined, and rules can't change.
-      await tx.league.update({ where: { id: leagueId }, data: { status: "drafting", settings } });
-      await tx.auditLog.create({ data: { leagueId, actorId: user.id, action: "draft.start", payload: { order } } });
+      await tx.league.update({ where: { id: leagueId }, data: { status: "drafting", settings, draftOrder: order } });
+      await tx.auditLog.create({ data: { leagueId, actorId, action: "draft.start", payload: { order, scheduled: actorId === null } } });
       return tx.draft.update({
         where: { id: draft.id },
         data: {
@@ -170,7 +190,37 @@ export class DraftEngine {
         },
       });
     });
-    return this.publicState(leagueId);
+    this.startTimers.cancel(leagueId);
+  }
+
+  // ---- Scheduled starts -------------------------------------------------------
+
+  /** Arm (or clear) the timer that starts a league's draft at its scheduled time. */
+  scheduleStart(leagueId: string, at: Date | null) {
+    if (at) this.startTimers.schedule(leagueId, 0, at);
+    else this.startTimers.cancel(leagueId);
+  }
+
+  /**
+   * Called when a scheduled draft time arrives. Re-checks the league (still
+   * in setup, time really reached) so a stale timer does nothing. Starts with
+   * whoever has joined, as long as there are at least two teams.
+   */
+  async autoStartIfDue(leagueId: string): Promise<boolean> {
+    try {
+      const league = await this.db.league.findUnique({ where: { id: leagueId }, include: { teams: true } });
+      if (!league || league.status !== "setup" || !league.draftAt || league.draftAt > this.now()) return false;
+      if (league.teams.length < 2) {
+        this.opts.log?.info({ leagueId }, "scheduled draft time reached with fewer than 2 teams; not starting");
+        return false;
+      }
+      await this.startDraft(leagueId, null);
+      this.opts.log?.info({ leagueId }, "draft started at its scheduled time");
+      return true;
+    } catch (err) {
+      this.opts.log?.error({ err, leagueId }, "scheduled draft start failed");
+      return false;
+    }
   }
 
   async pause(user: SessionUser, leagueId: string): Promise<DraftState> {
@@ -294,11 +344,18 @@ export class DraftEngine {
   async recover(): Promise<number> {
     const live = await this.db.draft.findMany({ where: { status: "live" } });
     for (const d of live) if (d.deadline) this.timers.schedule(d.id, d.currentPick, d.deadline);
+    // Scheduled starts too: any that came due while the server was down start now.
+    const scheduled = await this.db.league.findMany({
+      where: { status: "setup", draftAt: { not: null } },
+      select: { id: true, draftAt: true },
+    });
+    for (const l of scheduled) this.scheduleStart(l.id, l.draftAt);
     return live.length;
   }
 
   shutdown() {
     this.timers.cancelAll();
+    this.startTimers.cancelAll();
   }
 
   // ---- Internals --------------------------------------------------------------

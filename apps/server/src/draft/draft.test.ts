@@ -126,7 +126,8 @@ describe.runIf(hasTestDb)("draft room", () => {
   async function startInUserOrder() {
     const e = await engine();
     const order = users.map((u) => teamOf[u.id]!);
-    return e.start({ id: users[0]!.id, name: "", email: "", image: null, isAdmin: false }, leagueId, () => order);
+    await db.league.update({ where: { id: leagueId }, data: { draftOrderMode: "manual", draftOrderLocked: false, draftOrder: order } });
+    return e.start({ id: users[0]!.id, name: "", email: "", image: null, isAdmin: false }, leagueId);
   }
   const userOnClock = (s: DraftState) => users.find((u) => teamOf[u.id] === s.onClockTeamId)!;
 

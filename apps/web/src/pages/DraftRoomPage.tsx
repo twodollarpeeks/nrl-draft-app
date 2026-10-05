@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import type { DraftPlayer, DraftState, LeagueDetail, NrlPosition } from "@nrl/shared";
+import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
 import { ClockBar } from "../components/draft/ClockBar.tsx";
 import { BoardPanel, QueuePanel, TeamPanel, picksUntil } from "../components/draft/Panels.tsx";
 import { PlayerList } from "../components/draft/PlayerList.tsx";
@@ -221,10 +222,17 @@ function PreDraft({ league, onStart, starting }: { league: LeagueDetail; onStart
     <Card className="flex flex-col gap-3">
       <div>
         <div className="font-semibold">The draft hasn't started</div>
+        {league.draftAt && (
+          <p className="font-medium text-accent">Starts {formatDraftTime(league.draftAt)}</p>
+        )}
         <p className="text-sm text-muted">
-          {league.teamsJoined} teams · {league.settings.draft.pickSeconds}s per pick · snake order, drawn at random when the
-          draft starts. Queue players now: if your clock runs out, autopick uses your queue first.
+          {league.teamsJoined} teams · {league.settings.draft.pickSeconds}s per pick · snake order. Queue players now: if
+          your clock runs out, autopick uses your queue first.
         </p>
+      </div>
+      <div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Draft order</div>
+        <DraftOrderList league={league} />
       </div>
       {league.isCommissioner ? (
         <>

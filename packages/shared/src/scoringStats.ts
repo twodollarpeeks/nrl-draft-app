@@ -5,7 +5,7 @@
 // The first six keys predate the full catalogue and stay as they are, so
 // existing leagues' scoring keeps working.
 
-export type StatGroup = "Scoring" | "Attack" | "Defence" | "Kicking" | "Discipline & errors" | "General";
+export type StatGroup = "Scoring" | "Attack" | "Defence" | "Kicking" | "Discipline & errors";
 
 export interface StatDef {
   key: string;
@@ -26,7 +26,6 @@ export const STAT_CATALOGUE = [
   { key: "missedGoals", label: "Missed conversions", group: "Scoring", from: ["conversionAttempts"], subtract: ["conversions"] },
   { key: "onePointFieldGoals", label: "1-point field goals", group: "Scoring", from: ["onePointFieldGoals"] },
   { key: "twoPointFieldGoals", label: "2-point field goals", group: "Scoring", from: ["twoPointFieldGoals"] },
-  { key: "points", label: "Match points scored", group: "Scoring", from: ["points"], hint: "Points the player scored for their team" },
   // Attack
   { key: "runMetres", label: "Run metres", group: "Attack", unit: "per metre", from: ["allRunMetres"] },
   { key: "allRuns", label: "Runs", group: "Attack", from: ["allRuns"] },
@@ -72,11 +71,9 @@ export const STAT_CATALOGUE = [
   { key: "onReport", label: "On report", group: "Discipline & errors", from: ["onReport"] },
   { key: "sinBins", label: "Sin bins", group: "Discipline & errors", from: ["sinBins"] },
   { key: "sendOffs", label: "Send-offs", group: "Discipline & errors", from: ["sendOffs"] },
-  // General
-  { key: "minutesPlayed", label: "Minutes played", group: "General", unit: "per minute", from: ["minutesPlayed"] },
 ] as const satisfies readonly StatDef[];
 
-export const STAT_GROUPS: readonly StatGroup[] = ["Scoring", "Attack", "Defence", "Kicking", "Discipline & errors", "General"];
+export const STAT_GROUPS: readonly StatGroup[] = ["Scoring", "Attack", "Defence", "Kicking", "Discipline & errors"];
 
 export const STAT_BY_KEY: Readonly<Record<string, StatDef>> = Object.fromEntries(STAT_CATALOGUE.map((s) => [s.key, s]));
 

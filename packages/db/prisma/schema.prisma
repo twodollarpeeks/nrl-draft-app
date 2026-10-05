@@ -231,6 +231,14 @@ model League {
   status         String   @default("setup")
   // LeagueSettings from @nrl/shared, validated with zod on every write.
   settings       Json
+  // When the draft starts by itself (UTC). Null = the commissioner starts it.
+  draftAt           DateTime?
+  // "randomWhenFull": drawn and locked the moment the last team joins.
+  // "manual": the commissioner arranges it.
+  draftOrderMode    String    @default("randomWhenFull")
+  // Team ids in round-1 order; empty until set or drawn.
+  draftOrder        String[]
+  draftOrderLocked  Boolean   @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

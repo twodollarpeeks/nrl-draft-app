@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { squadSize, type LeagueDetail } from "@nrl/shared";
+import { seasonRounds, squadSize, type LeagueDetail } from "@nrl/shared";
+import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
 import { scoringSummary } from "../components/ScoringEditor.tsx";
 import { AppShell } from "../components/Layout.tsx";
 import { Avatar, Button, Card, ErrorText, SectionTitle, Spinner, inputClass } from "../components/ui.tsx";
@@ -45,12 +46,20 @@ export function LeaguePage() {
         </ul>
       </Card>
 
+      {league.status === "setup" && (
+        <Card>
+          <SectionTitle>Draft order</SectionTitle>
+          <DraftOrderList league={league} />
+        </Card>
+      )}
+
       <SettingsSummary league={league} />
     </AppShell>
   );
 }
 
 function DraftCard({ league }: { league: LeagueDetail }) {
+  const when = league.draftAt && league.status === "setup" ? `Draft ${formatDraftTime(league.draftAt)}` : null;
   const [title, hint] = {
     setup: [
       "Draft room",
@@ -71,6 +80,7 @@ function DraftCard({ league }: { league: LeagueDetail }) {
     >
       <div>
         <div className="font-semibold">{title}</div>
+        {when && <div className="text-sm font-medium text-accent">{when}</div>}
         <div className="text-sm text-muted">{hint}</div>
       </div>
       <span aria-hidden className="text-accent">
@@ -169,10 +179,12 @@ function SettingsSummary({ league }: { league: LeagueDetail }) {
         )}
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-        <dt className="text-muted">Season</dt>
+        <dt className="text-muted">NRL season</dt>
         <dd>{league.season}</dd>
         <dt className="text-muted">Format</dt>
         <dd>{format}</dd>
+        <dt className="text-muted">Fantasy rounds</dt>
+        <dd>{seasonText(s)}</dd>
         <dt className="text-muted">Draft</dt>
         <dd>Snake, {formatSeconds(s.draft.pickSeconds)} per pick</dd>
         <dt className="text-muted">Squad</dt>
@@ -186,6 +198,13 @@ function SettingsSummary({ league }: { league: LeagueDetail }) {
   );
 }
 
+
+function seasonText(s: LeagueDetail["settings"]) {
+  const r = seasonRounds(s.seasonEndRound, s.matchups);
+  return r.grandFinalRound
+    ? `Rounds 1–${r.lastRegularRound}, semis round ${r.semiFinalRound}, grand final round ${r.grandFinalRound}`
+    : `Rounds 1–${r.lastRegularRound}`;
+}
 
 function formatSeconds(s: number) {
   if (s < 120) return `${s}s`;

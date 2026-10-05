@@ -11,6 +11,7 @@ import type { Env } from "./env.ts";
 import { registerErrorHandler } from "./errors.ts";
 import { createGuards, parseAdminEmails } from "./guards.ts";
 import { registerLeagueRoutes } from "./leagues/routes.ts";
+import type { LeagueServiceOptions } from "./leagues/service.ts";
 
 export interface AppDeps {
   env: Env;
@@ -20,11 +21,13 @@ export interface AppDeps {
   getUser?: GetUser;
   /** Draft engine options (tests inject a clock and timers). */
   draft?: Omit<DraftEngineOptions, "onChange" | "log">;
+  /** League service options (tests inject a clock and shuffle). */
+  leagues?: Omit<LeagueServiceOptions, "onDraftAtChange">;
   /** Serve the draft room's sockets and run its clock (the real server). */
   realtime?: boolean;
 }
 
-export async function buildApp({ env, db, auth, getUser, draft, realtime = false }: AppDeps) {
+export async function buildApp({ env, db, auth, getUser, draft, leagues, realtime = false }: AppDeps) {
   const app = Fastify({
     logger: env.NODE_ENV === "test" ? false : { level: "info" },
   });
@@ -42,11 +45,13 @@ export async function buildApp({ env, db, auth, getUser, draft, realtime = false
   const userGetter = getUser ?? (auth ? sessionUserGetter(auth) : null);
   if (db && userGetter) {
     const guards = createGuards(userGetter, parseAdminEmails(env.ADMIN_EMAILS));
-    registerLeagueRoutes(app, db, guards);
-    registerAdminRoutes(app, db, guards);
-
     let broadcast: (state: DraftState) => void = () => {};
     const engine = new DraftEngine(db, { ...draft, onChange: (s) => broadcast(s), log: app.log });
+    registerLeagueRoutes(app, db, guards, {
+      ...(leagues ?? {}),
+      onDraftAtChange: (leagueId, at) => engine.scheduleStart(leagueId, at),
+    });
+    registerAdminRoutes(app, db, guards);
     registerDraftRoutes(app, engine, guards);
     app.decorate("draftEngine", engine);
 

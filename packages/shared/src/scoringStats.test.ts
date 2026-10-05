@@ -21,7 +21,7 @@ describe("stat catalogue", () => {
 
   it("maps a real stat line (Tabuai-Fidow, 2026 R5)", () => {
     const s = statLineFromRaw(lines.find((l) => l.playerId === 100001936)!);
-    expect(s).toMatchObject({ runMetres: 213, tackles: 10, tries: 2, errors: 2, lineBreaks: 1, tackleBreaks: 5, minutesPlayed: 80 });
+    expect(s).toMatchObject({ runMetres: 213, tackles: 10, tries: 2, errors: 2, lineBreaks: 1, tackleBreaks: 5 });
   });
 
   it("derives goals and missed conversions (nrl.com's own goals field is always 0)", () => {
@@ -34,5 +34,12 @@ describe("stat catalogue", () => {
     expect(ScoringRules.safeParse({ lineBreaks: 3 }).success).toBe(true);
     expect(ScoringRules.safeParse({ notAStat: 3 }).success).toBe(false);
     expect(ScoringRules.safeParse({ tries: 500 }).success).toBe(false);
+  });
+
+  it("doesn't offer minutes played or match points as fantasy stats", () => {
+    const keys: string[] = STAT_CATALOGUE.map((s) => s.key);
+    expect(keys).not.toContain("minutesPlayed");
+    expect(keys).not.toContain("points");
+    expect(ScoringRules.safeParse({ minutesPlayed: 1 }).success).toBe(false);
   });
 });

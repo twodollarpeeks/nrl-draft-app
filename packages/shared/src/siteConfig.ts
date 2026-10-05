@@ -74,6 +74,7 @@ export function applyCommissionerLimits(wanted: LeagueSettings, base: LeagueSett
     roster: can.roster ? wanted.roster : base.roster,
     draft: can.draftTimer ? wanted.draft : base.draft,
     matchups: can.format ? wanted.matchups : base.matchups,
+    seasonEndRound: can.format ? wanted.seasonEndRound : base.seasonEndRound,
     scoring,
   };
 }

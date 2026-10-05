@@ -13,13 +13,17 @@ export function ScoringEditor({
   canEdit = () => true,
   rowExtra,
   lockedNote = "Set by the site",
+  hideLockedZero = false,
 }: {
   value: ScoringRules;
   onChange: (next: ScoringRules) => void;
   canEdit?: (stat: ScoringStat) => boolean;
   rowExtra?: (stat: ScoringStat) => ReactNode;
   lockedNote?: string;
+  /** Hide stats that are locked and worth nothing (commissioners don't need to see them). */
+  hideLockedZero?: boolean;
 }) {
+  const visible = (s: StatDef) => !hideLockedZero || canEdit(s.key as ScoringStat) || scored(s);
   const scored = (s: StatDef) => (value[s.key as ScoringStat] ?? 0) !== 0;
   const [open, setOpen] = useState<Set<string>>(
     () => new Set(STAT_GROUPS.filter((g) => STAT_CATALOGUE.some((s) => s.group === g && scored(s)))),
@@ -35,7 +39,8 @@ export function ScoringEditor({
   return (
     <div className="flex flex-col gap-2">
       {STAT_GROUPS.map((group) => {
-        const stats: readonly StatDef[] = STAT_CATALOGUE.filter((s) => s.group === group);
+        const stats: readonly StatDef[] = STAT_CATALOGUE.filter((s) => s.group === group && visible(s));
+        if (stats.length === 0) return null;
         const count = stats.filter(scored).length;
         const isOpen = open.has(group);
         return (

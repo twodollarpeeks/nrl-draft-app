@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lastRegularRound, topFourBracket } from "./finals.ts";
+import { topFourBracket } from "./finals.ts";
 
 describe("topFourBracket", () => {
   const seeds = ["S1", "S2", "S3", "S4"] as const;
@@ -39,9 +39,3 @@ describe("topFourBracket", () => {
   });
 });
 
-describe("lastRegularRound", () => {
-  it("leaves the last 2 rounds for top-4 finals", () => {
-    expect(lastRegularRound(27, 4)).toBe(25);
-    expect(lastRegularRound(27, 0)).toBe(27);
-  });
-});

@@ -7,18 +7,31 @@ import { NrlPosition } from "./positions.ts";
 export const LeagueName = z.string().trim().min(2, "At least 2 characters").max(40, "At most 40 characters");
 export const TeamName = z.string().trim().min(2, "At least 2 characters").max(30, "At most 30 characters");
 
+export const DraftOrderMode = z.enum(["randomWhenFull", "manual"]);
+export type DraftOrderMode = z.infer<typeof DraftOrderMode>;
+
+/** When the draft starts by itself: an ISO date-time, or null for "the commissioner starts it". */
+export const DraftAt = z.iso.datetime({ offset: true }).nullable();
+
 export const CreateLeagueInput = z.object({
   name: LeagueName,
   season: z.number().int().min(2020).max(2100),
   teamName: TeamName.optional(),
   settings: LeagueSettings,
+  draftAt: DraftAt.optional(),
+  draftOrderMode: DraftOrderMode.optional(),
 });
 export type CreateLeagueInput = z.infer<typeof CreateLeagueInput>;
 
 export const UpdateLeagueInput = z.object({
   name: LeagueName.optional(),
   settings: LeagueSettings.optional(),
+  draftAt: DraftAt.optional(),
+  draftOrderMode: DraftOrderMode.optional(),
 });
+
+/** The commissioner's draft order: every team, round-1 order. */
+export const SetDraftOrderInput = z.object({ teamIds: z.array(z.string()).min(1).max(20) });
 export type UpdateLeagueInput = z.infer<typeof UpdateLeagueInput>;
 
 export const JoinLeagueInput = z.object({ teamName: TeamName.optional() });
@@ -55,6 +68,13 @@ export interface LeagueSummary {
 
 export interface LeagueDetail extends LeagueSummary {
   settings: LeagueSettings;
+  /** ISO time the draft starts by itself, or null. */
+  draftAt: string | null;
+  draftOrderMode: DraftOrderMode;
+  /** Team ids in round-1 order; empty until set or drawn. */
+  draftOrder: string[];
+  /** Drawn when the league filled: nobody can change it. */
+  draftOrderLocked: boolean;
   /** Only shown to members. */
   inviteCode: string;
   teams: TeamSummary[];

@@ -5,6 +5,7 @@ import {
   applyCommissionerLimits,
   leagueDefaults,
   type CreateLeagueInput,
+  type DraftOrderMode,
   type InvitePreview,
   type LeagueDetail,
   type LeagueStatus,
@@ -34,8 +35,62 @@ const leagueWithTeams = {
 } satisfies Prisma.LeagueInclude;
 type LeagueWithTeams = Prisma.LeagueGetPayload<{ include: typeof leagueWithTeams }>;
 
+export interface LeagueServiceOptions {
+  now?: () => Date;
+  shuffle?: (teamIds: string[]) => string[];
+  /** Told whenever a league's scheduled draft time is set or cleared. */
+  onDraftAtChange?: (leagueId: string, draftAt: Date | null) => void;
+}
+
+/** A draft can be scheduled no sooner than this from now. */
+const MIN_DRAFT_LEAD_MS = 60_000;
+
 export class LeagueService {
-  constructor(private readonly db: PrismaClient) {}
+  private readonly now: () => Date;
+  private readonly shuffle: (teamIds: string[]) => string[];
+
+  constructor(
+    private readonly db: PrismaClient,
+    private readonly opts: LeagueServiceOptions = {},
+  ) {
+    this.now = opts.now ?? (() => new Date());
+    this.shuffle = opts.shuffle ?? shuffleArray;
+  }
+
+  private checkDraftAt(draftAt: string | null | undefined): Date | null | undefined {
+    if (draftAt === undefined || draftAt === null) return draftAt;
+    const at = new Date(draftAt);
+    if (at.getTime() < this.now().getTime() + MIN_DRAFT_LEAD_MS) {
+      throw new AppError(400, "draft_in_past", "Pick a draft time in the future");
+    }
+    return at;
+  }
+
+  /**
+   * Keep the draft order in step with the teams: drop teams that left, add
+   * new ones at the end, and in "randomise when full" mode, draw and lock the
+   * order the moment the league fills.
+   */
+  private async reconcileDraftOrder(tx: Prisma.TransactionClient, leagueId: string, actorId: string | null) {
+    const league = await tx.league.findUniqueOrThrow({ where: { id: leagueId }, include: leagueWithTeams });
+    const settings = LeagueSettings.parse(league.settings);
+    const teamIds = league.teams.map((t) => t.id);
+    let order = league.draftOrder.filter((id) => teamIds.includes(id));
+    for (const id of teamIds) if (!order.includes(id)) order.push(id);
+    let locked = league.draftOrderLocked;
+
+    if (league.draftOrderMode === "randomWhenFull" && !locked) {
+      order = [];
+      if (teamIds.length >= settings.teamCount) {
+        order = this.shuffle(teamIds);
+        locked = true;
+        await tx.auditLog.create({ data: { leagueId, actorId, action: "draft.order.drawn", payload: { order } } });
+      }
+    }
+    if (order.join() !== league.draftOrder.join() || locked !== league.draftOrderLocked) {
+      await tx.league.update({ where: { id: leagueId }, data: { draftOrder: order, draftOrderLocked: locked } });
+    }
+  }
 
   /**
    * Settings as the site allows this user to have them: anything commissioners
@@ -50,6 +105,7 @@ export class LeagueService {
 
   async create(user: SessionUser, input: CreateLeagueInput): Promise<LeagueDetail> {
     const settings = await this.allowedSettings(user, input.settings);
+    const draftAt = this.checkDraftAt(input.draftAt) ?? null;
     const league = await this.db.$transaction(async (tx) => {
       const created = await tx.league.create({
         data: {
@@ -58,14 +114,18 @@ export class LeagueService {
           commissionerId: user.id,
           inviteCode: await this.uniqueInviteCode(tx),
           settings,
+          draftAt,
+          draftOrderMode: input.draftOrderMode ?? "randomWhenFull",
           teams: { create: { ownerId: user.id, name: input.teamName ?? defaultTeamName(user.name) } },
         },
       });
+      await this.reconcileDraftOrder(tx, created.id, user.id);
       await tx.auditLog.create({
         data: { leagueId: created.id, actorId: user.id, action: "league.create", payload: { name: input.name } },
       });
       return tx.league.findUniqueOrThrow({ where: { id: created.id }, include: leagueWithTeams });
     });
+    if (draftAt) this.opts.onDraftAtChange?.(league.id, draftAt);
     return toDetail(league, user.id);
   }
 
@@ -86,10 +146,15 @@ export class LeagueService {
   async update(user: SessionUser, leagueId: string, input: UpdateLeagueInput): Promise<LeagueDetail> {
     const league = await this.loadForMember(user, leagueId);
     if (league.commissionerId !== user.id) throw forbidden("Only the commissioner can change league settings");
+    const changesDraft = input.draftAt !== undefined || input.draftOrderMode !== undefined;
+    if ((input.settings || changesDraft) && league.status !== "setup") {
+      throw conflict("league_started", "Settings are locked once the draft has started");
+    }
+    if (input.draftOrderMode === "manual" && league.draftOrderLocked) {
+      throw conflict("order_locked", "The draft order was drawn when the league filled and is locked");
+    }
+    const draftAt = this.checkDraftAt(input.draftAt);
     if (input.settings) {
-      if (league.status !== "setup") {
-        throw conflict("league_started", "Settings are locked once the draft has started");
-      }
       if (input.settings.teamCount < league.teams.length) {
         throw conflict("too_many_teams", `${league.teams.length} teams have already joined`);
       }
@@ -97,16 +162,59 @@ export class LeagueService {
     const settings = input.settings
       ? await this.allowedSettings(user, input.settings, LeagueSettings.parse(league.settings))
       : undefined;
-    await this.db.$transaction([
-      this.db.league.update({
+    await this.db.$transaction(async (tx) => {
+      await tx.league.update({
         where: { id: leagueId },
-        data: { ...(input.name ? { name: input.name } : {}), ...(settings ? { settings } : {}) },
-      }),
-      this.db.auditLog.create({
+        data: {
+          ...(input.name ? { name: input.name } : {}),
+          ...(settings ? { settings } : {}),
+          ...(draftAt !== undefined ? { draftAt } : {}),
+          ...(input.draftOrderMode ? { draftOrderMode: input.draftOrderMode } : {}),
+        },
+      });
+      // A smaller league or a mode change can mean the order is due to be drawn.
+      await this.reconcileDraftOrder(tx, leagueId, user.id);
+      await tx.auditLog.create({
         data: { leagueId, actorId: user.id, action: "league.update", payload: input as Prisma.InputJsonValue },
-      }),
+      });
+    });
+    if (draftAt !== undefined) this.opts.onDraftAtChange?.(leagueId, draftAt);
+    return this.get(user, leagueId);
+  }
+
+  /** Commissioner arranges the order (manual mode, before the draft). */
+  async setDraftOrder(user: SessionUser, leagueId: string, teamIds: string[]): Promise<LeagueDetail> {
+    const league = await this.orderEditable(user, leagueId);
+    const current = league.teams.map((t) => t.id);
+    const valid = teamIds.length === current.length && new Set(teamIds).size === teamIds.length && teamIds.every((id) => current.includes(id));
+    if (!valid) throw new AppError(400, "bad_order", "The order must list every team exactly once");
+    await this.db.$transaction([
+      this.db.league.update({ where: { id: leagueId }, data: { draftOrder: teamIds } }),
+      this.db.auditLog.create({ data: { leagueId, actorId: user.id, action: "draft.order.set", payload: { teamIds } } }),
     ]);
     return this.get(user, leagueId);
+  }
+
+  /** Shuffle the order now (manual mode); the commissioner can still rearrange it. */
+  async randomiseDraftOrder(user: SessionUser, leagueId: string): Promise<LeagueDetail> {
+    const league = await this.orderEditable(user, leagueId);
+    const order = this.shuffle(league.teams.map((t) => t.id));
+    await this.db.$transaction([
+      this.db.league.update({ where: { id: leagueId }, data: { draftOrder: order } }),
+      this.db.auditLog.create({ data: { leagueId, actorId: user.id, action: "draft.order.randomised", payload: { order } } }),
+    ]);
+    return this.get(user, leagueId);
+  }
+
+  private async orderEditable(user: SessionUser, leagueId: string) {
+    const league = await this.loadForMember(user, leagueId);
+    if (league.commissionerId !== user.id) throw forbidden("Only the commissioner can set the draft order");
+    if (league.status !== "setup") throw conflict("league_started", "The draft has already started");
+    if (league.draftOrderLocked) throw conflict("order_locked", "The draft order was drawn when the league filled and is locked");
+    if ((league.draftOrderMode as DraftOrderMode) !== "manual") {
+      throw conflict("order_random", "Switch the draft order to manual to arrange it");
+    }
+    return league;
   }
 
   async regenerateInvite(user: SessionUser, leagueId: string): Promise<LeagueDetail> {
@@ -169,6 +277,7 @@ export class LeagueService {
         }
         await tx.team.create({ data: { leagueId: id, ownerId: user.id, name } });
         await tx.auditLog.create({ data: { leagueId: id, actorId: user.id, action: "team.join", payload: { name } } });
+        await this.reconcileDraftOrder(tx, id, user.id);
         return id;
       },
     );
@@ -234,9 +343,14 @@ function toSummary(league: LeagueWithTeams, userId: string): LeagueSummary {
 }
 
 function toDetail(league: LeagueWithTeams, userId: string): LeagueDetail {
+  const teamIds = new Set(league.teams.map((t) => t.id));
   return {
     ...toSummary(league, userId),
     settings: LeagueSettings.parse(league.settings),
+    draftAt: league.draftAt?.toISOString() ?? null,
+    draftOrderMode: league.draftOrderMode as DraftOrderMode,
+    draftOrder: league.draftOrder.filter((id) => teamIds.has(id)),
+    draftOrderLocked: league.draftOrderLocked,
     inviteCode: league.inviteCode,
     teams: league.teams.map((t) => ({
       id: t.id,
@@ -245,4 +359,13 @@ function toDetail(league: LeagueWithTeams, userId: string): LeagueDetail {
       isCommissioner: t.ownerId === league.commissionerId,
     })),
   };
+}
+
+export function shuffleArray<T>(xs: readonly T[]): T[] {
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [a[i], a[j]] = [a[j]!, a[i]!];
+  }
+  return a;
 }

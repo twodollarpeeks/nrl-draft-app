@@ -2,6 +2,7 @@ import {
   CreateLeagueInput,
   JoinLeagueInput,
   RenameTeamInput,
+  SetDraftOrderInput,
   UpdateLeagueInput,
   UpdateProfileInput,
   SCORING_STATS,
@@ -12,10 +13,15 @@ import type { PrismaClient } from "@nrl/db";
 import type { FastifyInstance } from "fastify";
 import type { Guards } from "../guards.ts";
 import { getSiteConfig } from "../siteConfig.ts";
-import { LeagueService } from "./service.ts";
+import { LeagueService, type LeagueServiceOptions } from "./service.ts";
 
-export function registerLeagueRoutes(app: FastifyInstance, db: PrismaClient, { requireUser }: Guards) {
-  const leagues = new LeagueService(db);
+export function registerLeagueRoutes(
+  app: FastifyInstance,
+  db: PrismaClient,
+  { requireUser }: Guards,
+  serviceOptions: LeagueServiceOptions = {},
+) {
+  const leagues = new LeagueService(db, serviceOptions);
 
   type IdParams = { Params: { id: string } };
   type CodeParams = { Params: { code: string } };
@@ -69,6 +75,15 @@ export function registerLeagueRoutes(app: FastifyInstance, db: PrismaClient, { r
     const { teamName } = JoinLeagueInput.parse(req.body ?? {});
     return leagues.join(await requireUser(req), req.params.code, teamName);
   });
+
+  app.put<IdParams>("/api/leagues/:id/draft-order", async (req) => {
+    const { teamIds } = SetDraftOrderInput.parse(req.body);
+    return leagues.setDraftOrder(await requireUser(req), req.params.id, teamIds);
+  });
+
+  app.post<IdParams>("/api/leagues/:id/draft-order/randomise", async (req) =>
+    leagues.randomiseDraftOrder(await requireUser(req), req.params.id),
+  );
 
   app.patch<IdParams>("/api/teams/:id", async (req) => {
     const { name } = RenameTeamInput.parse(req.body);
