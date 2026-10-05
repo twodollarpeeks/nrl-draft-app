@@ -13,8 +13,13 @@ when a decision changes.
 - **Squad (default, commissioner-editable):** 1 HB/HK (HB, FE, HK), 3 FWD
   (FRF, 2RF, LK), 3 OB (FB, WG, CE), 1 Flex (any), 6 bench. Only starters
   score.
-- **Scoring (default, editable):** run metres 0.1/m, tackles 1, tries 6, try
-  assists 4, goals 2 (conversions + penalty goals), errors -4.
+- **Scoring:** any of ~48 nrl.com stats (catalogue in packages/shared). Site
+  default (admin panel → Scoring & permissions) starts at run metres 0.1/m,
+  tackles 0.25, tries 8, try assists 4, goals 2, errors -4: the balanced set
+  from the 2026 analysis. New leagues copy the site default; existing leagues
+  keep theirs. The admin chooses what commissioners may change (scoring and
+  which stats, squad, pick timer, format); league size is always theirs. Site
+  admins aren't limited.
 - **Non-playing starters:** ordered emergencies. The first bench player in the
   manager's emergency order who is eligible for the slot and played comes in.
 - **Lineup lock:** per player at their match's kickoff.

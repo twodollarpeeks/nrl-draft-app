@@ -2,20 +2,21 @@ import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { LeagueName, LeagueSettings, type LeagueDetail } from "@nrl/shared";
 import { AppShell } from "../components/Layout.tsx";
-import { SettingsEditor } from "../components/SettingsEditor.tsx";
+import { SettingsEditor, type SettingsLimits } from "../components/SettingsEditor.tsx";
 import { Button, Card, ErrorText, Field, SectionTitle, Spinner, inputClass } from "../components/ui.tsx";
-import { useLeague, useResetInvite, useUpdateLeague } from "../lib/queries.ts";
+import { useLeague, useLeagueDefaults, useResetInvite, useUpdateLeague } from "../lib/queries.ts";
 
 export function LeagueSettingsPage() {
   const { id = "" } = useParams();
   const { data: league, isPending, error } = useLeague(id);
-  if (isPending) return <AppShell back={`/l/${id}`}><Spinner /></AppShell>;
-  if (!league) return <AppShell back={`/l/${id}`}><ErrorText error={error} /></AppShell>;
+  const defaults = useLeagueDefaults();
+  if (isPending || defaults.isPending) return <AppShell back={`/l/${id}`}><Spinner /></AppShell>;
+  if (!league || !defaults.data) return <AppShell back={`/l/${id}`}><ErrorText error={error ?? defaults.error} /></AppShell>;
   if (!league.isCommissioner) return <Navigate to={`/l/${id}`} replace />;
-  return <SettingsForm league={league} />;
+  return <SettingsForm league={league} limits={defaults.data} />;
 }
 
-function SettingsForm({ league }: { league: LeagueDetail }) {
+function SettingsForm({ league, limits }: { league: LeagueDetail; limits: SettingsLimits }) {
   const navigate = useNavigate();
   const update = useUpdateLeague(league.id);
   const resetInvite = useResetInvite(league.id);
@@ -49,7 +50,7 @@ function SettingsForm({ league }: { league: LeagueDetail }) {
             <p className="text-sm text-muted">Rules are locked once the draft has started.</p>
           </Card>
         ) : (
-          <SettingsEditor value={settings} onChange={setSettings} minTeams={league.teamsJoined} />
+          <SettingsEditor value={settings} onChange={setSettings} minTeams={league.teamsJoined} limits={limits} />
         )}
 
         <ErrorText error={formError ?? update.error} />

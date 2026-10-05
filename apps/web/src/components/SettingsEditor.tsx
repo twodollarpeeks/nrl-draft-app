@@ -1,14 +1,23 @@
 import {
   MAX_TEAMS,
   MIN_TEAMS,
-  SCORING_STAT_LABELS,
-  SCORING_STATS,
   squadSize,
+  type CommissionerPermissions,
   type LeagueSettings,
+  type ScoringStat,
   type MatchupSettings,
 } from "@nrl/shared";
 import type { ReactNode } from "react";
+import { ScoringEditor, scoringSummary } from "./ScoringEditor.tsx";
 import { Card, SectionTitle, inputClass } from "./ui.tsx";
+
+/** What the site lets this user change (from /api/league-defaults). */
+export interface SettingsLimits {
+  commissionerCan: CommissionerPermissions;
+  commissionerStats: ScoringStat[];
+}
+
+const LOCKED = "Set by the site admin";
 
 const PICK_TIMES: Array<[number, string]> = [
   [30, "30 seconds"],
@@ -38,13 +47,17 @@ export function SettingsEditor({
   value,
   onChange,
   minTeams = MIN_TEAMS,
+  limits,
 }: {
   value: LeagueSettings;
   onChange: (next: LeagueSettings) => void;
   minTeams?: number;
+  limits: SettingsLimits;
 }) {
   const set = <K extends keyof LeagueSettings>(key: K, v: LeagueSettings[K]) => onChange({ ...value, [key]: v });
   const { roster } = value;
+  const can = limits.commissionerCan;
+  const allowedStats = new Set(limits.commissionerStats);
 
   return (
     <>
@@ -60,7 +73,10 @@ export function SettingsEditor({
               onChange={(n) => set("teamCount", n)}
             />
           </Row>
-          <Row label="Pick timer">
+          <Row label="Pick timer" hint={can.draftTimer ? undefined : LOCKED}>
+            {!can.draftTimer ? (
+              <span className="text-sm">{PICK_TIMES.find(([s]) => s === value.draft.pickSeconds)?.[1] ?? `${value.draft.pickSeconds}s`}</span>
+            ) : (
             <select
               className={inputClass}
               value={value.draft.pickSeconds}
@@ -72,9 +88,10 @@ export function SettingsEditor({
                 </option>
               ))}
             </select>
+            )}
           </Row>
           <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-medium">Format</legend>
+            <legend className="mb-2 text-sm font-medium">Format{can.format ? "" : ` · ${LOCKED}`}</legend>
             {(
               [
                 ["h2hFinals", "Head-to-head + top 4 finals", "Weekly matchups; semis round 26, grand final round 27"],
@@ -84,11 +101,12 @@ export function SettingsEditor({
             ).map(([choice, label, hint]) => (
               <label
                 key={choice}
-                className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 has-checked:border-accent"
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 has-checked:border-accent has-disabled:cursor-default has-disabled:opacity-60"
               >
                 <input
                   type="radio"
                   name="format"
+                  disabled={!can.format}
                   className="mt-1 accent-(--color-accent)"
                   checked={matchupChoice(value.matchups) === choice}
                   onChange={() => set("matchups", matchupsFor(choice, value.matchups))}
@@ -105,6 +123,12 @@ export function SettingsEditor({
 
       <Card>
         <SectionTitle>Squad · {squadSize(roster)} players</SectionTitle>
+        {!can.roster ? (
+          <p className="text-sm">
+            {roster.slots.map((s) => `${s.count} ${s.label}`).join(", ")}, {roster.benchSize} bench
+            <span className="block text-xs text-muted">{LOCKED}</span>
+          </p>
+        ) : (
         <div className="flex flex-col gap-3">
           {roster.slots.map((slot, i) => (
             <Row key={slot.key} label={slot.label} hint={slot.eligible.join(" · ")}>
@@ -130,27 +154,24 @@ export function SettingsEditor({
             />
           </Row>
         </div>
+        )}
       </Card>
 
       <Card>
         <SectionTitle>Scoring</SectionTitle>
-        <div className="flex flex-col gap-3">
-          {SCORING_STATS.map((stat) => (
-            <Row key={stat} label={SCORING_STAT_LABELS[stat]}>
-              <input
-                type="number"
-                inputMode="decimal"
-                step={stat === "runMetres" ? 0.01 : 0.5}
-                min={-50}
-                max={50}
-                aria-label={`${SCORING_STAT_LABELS[stat]} points`}
-                className={`${inputClass} w-24 text-right font-mono`}
-                value={value.scoring[stat] ?? 0}
-                onChange={(e) => set("scoring", { ...value.scoring, [stat]: Number(e.target.value) })}
-              />
-            </Row>
-          ))}
-        </div>
+        {!can.scoring || allowedStats.size === 0 ? (
+          <p className="text-sm">
+            {scoringSummary(value.scoring) || "Nothing scores"}
+            <span className="block text-xs text-muted">{LOCKED}</span>
+          </p>
+        ) : (
+          <ScoringEditor
+            value={value.scoring}
+            onChange={(scoring) => set("scoring", scoring)}
+            canEdit={(stat) => allowedStats.has(stat)}
+            lockedNote={LOCKED}
+          />
+        )}
       </Card>
     </>
   );

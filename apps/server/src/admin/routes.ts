@@ -1,6 +1,8 @@
 import type { Prisma, PrismaClient } from "@nrl/db";
 import {
   PlayerFilter,
+  PreviewScoringInput,
+  SiteConfig,
   UpdatePlayerPositionsInput,
   effectivePositions,
   type AdminPlayer,
@@ -10,6 +12,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { notFound } from "../errors.ts";
 import type { Guards } from "../guards.ts";
+import { getSiteConfig, saveSiteConfig } from "../siteConfig.ts";
+import { scoringPreview } from "./scoringPreview.ts";
 
 const ListQuery = z.object({
   filter: PlayerFilter.default("missing"),
@@ -78,5 +82,25 @@ export function registerAdminRoutes(app: FastifyInstance, db: PrismaClient, { re
     const updated = await db.player.update({ where: { id }, data: { positionsOverride }, select: playerSelect });
     req.log.info({ admin: admin.email, playerId: id, positionsOverride }, "player positions overridden");
     return toAdminPlayer(updated);
+  });
+
+  // ---- Site config: default scoring and commissioner permissions ----------
+
+  app.get("/api/admin/site-config", async (req) => {
+    await requireAdmin(req);
+    return getSiteConfig(db);
+  });
+
+  app.put("/api/admin/site-config", async (req) => {
+    const admin = await requireAdmin(req);
+    const config = SiteConfig.parse(req.body);
+    req.log.info({ admin: admin.email }, "site config updated");
+    return saveSiteConfig(db, config, admin.email);
+  });
+
+  app.post("/api/admin/scoring/preview", async (req) => {
+    await requireAdmin(req);
+    const { scoring } = PreviewScoringInput.parse(req.body);
+    return scoringPreview(db, scoring);
   });
 }

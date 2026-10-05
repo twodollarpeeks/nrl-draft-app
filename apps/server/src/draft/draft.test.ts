@@ -35,6 +35,7 @@ const SETTINGS: LeagueSettings = {
     benchSize: 1,
   },
   draft: { type: "snake", pickSeconds: 60 },
+  scoring: { runMetres: 0.1, tackles: 1, tries: 6, tryAssists: 4, goals: 2, errors: -4 },
 };
 
 /** 30 players across positions with 2026 stats; lower id = more tries = higher rank. */
@@ -59,6 +60,7 @@ async function seedPool(db: PrismaClient) {
       data: {
         matchId: "m1", playerId: i, clubId: 1, jersey: i, positionLabel: "x", isStarter: true,
         minutes: 80, runMetres: 100, tackles: 10, tries: 31 - i, tryAssists: 0, goals: 0, errors: 0,
+        stats: { minutesPlayed: 80, allRunMetres: 100, tacklesMade: 10, tries: 31 - i },
       },
     });
   }

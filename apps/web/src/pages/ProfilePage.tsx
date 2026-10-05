@@ -54,9 +54,14 @@ export function ProfilePage() {
       {me?.isAdmin && (
         <Card>
           <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Site admin</div>
-          <Link to="/admin/players" className="font-medium text-accent">
-            Player positions →
-          </Link>
+          <div className="flex flex-col gap-2">
+            <Link to="/admin/scoring" className="font-medium text-accent">
+              Scoring & permissions →
+            </Link>
+            <Link to="/admin/players" className="font-medium text-accent">
+              Player positions →
+            </Link>
+          </div>
         </Card>
       )}
       <Button variant="secondary" onClick={signOut}>

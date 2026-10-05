@@ -6,6 +6,7 @@ import "./index.css";
 import { RequireAuth } from "./components/Layout.tsx";
 import { ApiRequestError } from "./lib/api.ts";
 import { AdminPlayersPage } from "./pages/AdminPlayersPage.tsx";
+import { AdminScoringPage } from "./pages/AdminScoringPage.tsx";
 import { CreateLeaguePage } from "./pages/CreateLeaguePage.tsx";
 import { DraftRoomPage } from "./pages/DraftRoomPage.tsx";
 import { JoinPage } from "./pages/JoinPage.tsx";
@@ -40,6 +41,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/l/:id/settings" element={authed(<LeagueSettingsPage />)} />
           <Route path="/profile" element={authed(<ProfilePage />)} />
           <Route path="/admin/players" element={authed(<AdminPlayersPage />)} />
+          <Route path="/admin/scoring" element={authed(<AdminScoringPage />)} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

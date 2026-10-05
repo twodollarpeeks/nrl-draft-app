@@ -2,6 +2,8 @@ import { randomInt } from "node:crypto";
 import type { Prisma, PrismaClient } from "@nrl/db";
 import {
   LeagueSettings,
+  applyCommissionerLimits,
+  leagueDefaults,
   type CreateLeagueInput,
   type InvitePreview,
   type LeagueDetail,
@@ -11,6 +13,7 @@ import {
 } from "@nrl/shared";
 import type { SessionUser } from "../auth.ts";
 import { AppError, conflict, forbidden, notFound } from "../errors.ts";
+import { getSiteConfig } from "../siteConfig.ts";
 
 // No 0/O/1/I/L, so codes survive being read out or typed from a phone.
 const INVITE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -34,7 +37,19 @@ type LeagueWithTeams = Prisma.LeagueGetPayload<{ include: typeof leagueWithTeams
 export class LeagueService {
   constructor(private readonly db: PrismaClient) {}
 
+  /**
+   * Settings as the site allows this user to have them: anything commissioners
+   * may not change comes from `base` (site defaults for a new league, the
+   * league's current settings for an edit). Site admins aren't limited.
+   */
+  private async allowedSettings(user: SessionUser, wanted: LeagueSettings, base?: LeagueSettings) {
+    if (user.isAdmin) return wanted;
+    const config = await getSiteConfig(this.db);
+    return applyCommissionerLimits(wanted, base ?? leagueDefaults(config).settings, config);
+  }
+
   async create(user: SessionUser, input: CreateLeagueInput): Promise<LeagueDetail> {
+    const settings = await this.allowedSettings(user, input.settings);
     const league = await this.db.$transaction(async (tx) => {
       const created = await tx.league.create({
         data: {
@@ -42,7 +57,7 @@ export class LeagueService {
           season: input.season,
           commissionerId: user.id,
           inviteCode: await this.uniqueInviteCode(tx),
-          settings: input.settings,
+          settings,
           teams: { create: { ownerId: user.id, name: input.teamName ?? defaultTeamName(user.name) } },
         },
       });
@@ -79,10 +94,13 @@ export class LeagueService {
         throw conflict("too_many_teams", `${league.teams.length} teams have already joined`);
       }
     }
+    const settings = input.settings
+      ? await this.allowedSettings(user, input.settings, LeagueSettings.parse(league.settings))
+      : undefined;
     await this.db.$transaction([
       this.db.league.update({
         where: { id: leagueId },
-        data: { ...(input.name ? { name: input.name } : {}), ...(input.settings ? { settings: input.settings } : {}) },
+        data: { ...(input.name ? { name: input.name } : {}), ...(settings ? { settings } : {}) },
       }),
       this.db.auditLog.create({
         data: { leagueId, actorId: user.id, action: "league.update", payload: input as Prisma.InputJsonValue },

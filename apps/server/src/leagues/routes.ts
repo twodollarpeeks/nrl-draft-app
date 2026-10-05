@@ -4,10 +4,14 @@ import {
   RenameTeamInput,
   UpdateLeagueInput,
   UpdateProfileInput,
+  SCORING_STATS,
+  leagueDefaults,
+  type LeagueDefaults,
 } from "@nrl/shared";
 import type { PrismaClient } from "@nrl/db";
 import type { FastifyInstance } from "fastify";
 import type { Guards } from "../guards.ts";
+import { getSiteConfig } from "../siteConfig.ts";
 import { LeagueService } from "./service.ts";
 
 export function registerLeagueRoutes(app: FastifyInstance, db: PrismaClient, { requireUser }: Guards) {
@@ -17,6 +21,20 @@ export function registerLeagueRoutes(app: FastifyInstance, db: PrismaClient, { r
   type CodeParams = { Params: { code: string } };
 
   app.get("/api/me", async (req) => requireUser(req));
+
+  // Defaults for a new league, and which settings the user may change.
+  app.get("/api/league-defaults", async (req): Promise<LeagueDefaults> => {
+    const user = await requireUser(req);
+    const defaults = leagueDefaults(await getSiteConfig(db));
+    // Site admins aren't limited.
+    return user.isAdmin
+      ? {
+          ...defaults,
+          commissionerCan: { scoring: true, roster: true, draftTimer: true, format: true },
+          commissionerStats: [...SCORING_STATS],
+        }
+      : defaults;
+  });
 
   app.patch("/api/me", async (req) => {
     const user = await requireUser(req);

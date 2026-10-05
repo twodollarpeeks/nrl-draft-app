@@ -367,3 +367,14 @@ model RosterEntry {
   @@index([teamId])
   @@index([leagueId, playerId])
 }
+
+// ---------------------------------------------------------------------------
+// Site settings (edited by site admins), one JSON value per key.
+// ---------------------------------------------------------------------------
+
+model SiteSetting {
+  key       String   @id // e.g. "config"
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String? // admin's email
+}

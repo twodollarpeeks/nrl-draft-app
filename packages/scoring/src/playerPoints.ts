@@ -1,6 +1,7 @@
 import { SCORING_STATS, type ScoringRules, type ScoringStat } from "@nrl/shared";
 
-export type StatLine = Record<ScoringStat, number>;
+/** A player's stats for a match (or a season), keyed by catalogue stat. Missing = 0. */
+export type StatLine = Partial<Record<ScoringStat, number>>;
 
 /** Round to 2 decimal places, avoiding float noise like 21.300000000000001. */
 export function roundPoints(n: number): number {
@@ -11,7 +12,8 @@ export function roundPoints(n: number): number {
 export function playerPoints(stats: StatLine, rules: ScoringRules): number {
   let total = 0;
   for (const stat of SCORING_STATS) {
-    total += (stats[stat] ?? 0) * (rules[stat] ?? 0);
+    const value = rules[stat];
+    if (value) total += (stats[stat] ?? 0) * value;
   }
   return roundPoints(total);
 }

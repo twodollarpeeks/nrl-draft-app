@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { DEFAULT_LEAGUE_SETTINGS, LeagueName, LeagueSettings } from "@nrl/shared";
+import { LeagueName, LeagueSettings, type LeagueDefaults } from "@nrl/shared";
 import { AppShell } from "../components/Layout.tsx";
 import { SettingsEditor } from "../components/SettingsEditor.tsx";
-import { Button, Card, ErrorText, Field, inputClass } from "../components/ui.tsx";
-import { useCreateLeague } from "../lib/queries.ts";
+import { Button, Card, ErrorText, Field, Spinner, inputClass } from "../components/ui.tsx";
+import { useCreateLeague, useLeagueDefaults } from "../lib/queries.ts";
 
 // Leagues play the upcoming season; the one just finished is available for
 // trying things out against real stats.
@@ -12,12 +12,24 @@ const THIS_YEAR = new Date().getFullYear();
 const SEASONS = [THIS_YEAR + 1, THIS_YEAR];
 
 export function CreateLeaguePage() {
+  const defaults = useLeagueDefaults();
+  if (!defaults.data) {
+    return (
+      <AppShell title="New league" back="/leagues">
+        {defaults.isPending ? <Spinner /> : <ErrorText error={defaults.error} />}
+      </AppShell>
+    );
+  }
+  return <CreateLeagueForm defaults={defaults.data} />;
+}
+
+function CreateLeagueForm({ defaults }: { defaults: LeagueDefaults }) {
   const navigate = useNavigate();
   const create = useCreateLeague();
   const [name, setName] = useState("");
   const [season, setSeason] = useState(SEASONS[0]!);
   const [teamName, setTeamName] = useState("");
-  const [settings, setSettings] = useState<LeagueSettings>(DEFAULT_LEAGUE_SETTINGS);
+  const [settings, setSettings] = useState<LeagueSettings>(defaults.settings);
   const [formError, setFormError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
@@ -58,7 +70,7 @@ export function CreateLeaguePage() {
           </Field>
         </Card>
 
-        <SettingsEditor value={settings} onChange={setSettings} />
+        <SettingsEditor value={settings} onChange={setSettings} limits={defaults} />
 
         <ErrorText error={formError ?? create.error} />
         <Button type="submit" disabled={create.isPending} className="sticky bottom-4 shadow-lg">

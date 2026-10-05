@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { NRL_POSITIONS, NrlPosition } from "./positions.ts";
+import { STAT_CATALOGUE } from "./scoringStats.ts";
+
+type StatKey = (typeof STAT_CATALOGUE)[number]["key"];
 
 // ---- Roster template ------------------------------------------------------
 
@@ -47,37 +50,31 @@ export const DEFAULT_ROSTER_TEMPLATE: RosterTemplate = {
 // ---- Scoring ----------------------------------------------------------------
 
 // The stats a league can put a value on. Values are points per unit (run
-// metres are per metre, so 0.1 = 1 point per 10m).
-export const SCORING_STATS = [
-  "runMetres",
-  "tackles",
-  "tries",
-  "tryAssists",
-  "goals",
-  "errors",
-] as const;
+// metres are per metre, so 0.1 = 1 point per 10m). The full list of stats is
+// in scoringStats.ts.
+export const SCORING_STATS = STAT_CATALOGUE.map((s) => s.key) as [StatKey, ...StatKey[]];
 export const ScoringStat = z.enum(SCORING_STATS);
-export type ScoringStat = z.infer<typeof ScoringStat>;
+export type ScoringStat = StatKey;
 
-export const SCORING_STAT_LABELS: Record<ScoringStat, string> = {
-  runMetres: "Run metres (per metre)",
-  tackles: "Tackles",
-  tries: "Tries",
-  tryAssists: "Try assists",
-  goals: "Goals",
-  errors: "Errors",
-};
+export const SCORING_STAT_LABELS: Record<ScoringStat, string> = Object.fromEntries(
+  STAT_CATALOGUE.map((s) => [s.key, "unit" in s ? `${s.label} (${s.unit})` : s.label]),
+) as Record<ScoringStat, string>;
 
-export const ScoringRules = z.record(
-  ScoringStat,
-  z.number().min(-50).max(50),
-);
+/** Points per stat. Stats left out score nothing. */
+export const ScoringRules = z.partialRecord(ScoringStat, z.number().min(-50).max(50));
 export type ScoringRules = z.infer<typeof ScoringRules>;
 
+/** Stats that score in a set of rules (non-zero), in catalogue order. */
+export function activeStats(rules: ScoringRules): ScoringStat[] {
+  return SCORING_STATS.filter((s) => (rules[s] ?? 0) !== 0);
+}
+
+// The balanced set from the 2026 analysis: a typical starter at each position
+// group scores about the same per game.
 export const DEFAULT_SCORING: ScoringRules = {
   runMetres: 0.1,
-  tackles: 1,
-  tries: 6,
+  tackles: 0.25,
+  tries: 8,
   tryAssists: 4,
   goals: 2,
   errors: -4,

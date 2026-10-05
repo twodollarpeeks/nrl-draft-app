@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CreateLeagueInput,
   InvitePreview,
+  LeagueDefaults,
   LeagueDetail,
   LeagueSummary,
   Me,
@@ -56,3 +57,7 @@ export const useRenameTeam = () =>
   useLeagueMutation(({ teamId, name }: { teamId: string; name: string }) =>
     api<LeagueDetail>(`/api/teams/${teamId}`, { method: "PATCH", body: { name } }),
   );
+
+/** New-league defaults and what this user may change (site admin settings). */
+export const useLeagueDefaults = () =>
+  useQuery({ queryKey: ["league-defaults"], queryFn: () => api<LeagueDefaults>("/api/league-defaults") });

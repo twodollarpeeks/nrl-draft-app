@@ -1,6 +1,12 @@
-import type { PrismaClient } from "@nrl/db";
+import { Prisma, type PrismaClient } from "@nrl/db";
 import { playerPoints } from "@nrl/scoring";
-import { effectivePositions, type DraftPlayer, type ScoringRules } from "@nrl/shared";
+import {
+  RAW_STAT_FIELDS,
+  effectivePositions,
+  statLineFromRaw,
+  type DraftPlayer,
+  type ScoringRules,
+} from "@nrl/shared";
 
 /**
  * The season whose stats rank players for a league's draft: the latest season
@@ -18,15 +24,39 @@ export async function rankingSeason(db: PrismaClient, leagueSeason: number): Pro
   return same?.season ?? null;
 }
 
-interface Totals {
-  player_id: number;
+/** The most recent season with any match data. */
+export async function latestSeason(db: PrismaClient): Promise<number | null> {
+  const r = await db.round.findFirst({ where: { matches: { some: {} } }, orderBy: { season: "desc" }, select: { season: true } });
+  return r?.season ?? null;
+}
+
+export interface SeasonTotals {
+  playerId: number;
   games: number;
-  run_metres: number;
-  tackles: number;
-  tries: number;
-  try_assists: number;
-  goals: number;
-  errors: number;
+  /** Every raw nrl.com stat field, summed over the games played. */
+  raw: Record<string, number>;
+}
+
+// Field names come from the stat catalogue (a fixed list in our code), but
+// they're spliced into SQL, so check they're plain identifiers anyway.
+const SAFE_FIELDS = RAW_STAT_FIELDS.filter((f) => /^[A-Za-z0-9]+$/.test(f));
+
+/**
+ * Regular-season totals per player for a season, over games where they took
+ * the field: one aggregate query over the stored match stats.
+ */
+export async function seasonTotals(db: PrismaClient, season: number): Promise<SeasonTotals[]> {
+  const sums = Prisma.join(
+    SAFE_FIELDS.map((f) => Prisma.raw(`SUM(COALESCE((a.stats->>'${f}')::numeric, 0))::float8 AS "${f}"`)),
+  );
+  const rows = await db.$queryRaw<Array<Record<string, number> & { player_id: number; games: number }>>`
+    SELECT a."playerId" AS player_id, COUNT(*)::int AS games, ${sums}
+    FROM "Appearance" a
+    JOIN "Match" m ON m.id = a."matchId"
+    JOIN "Round" r ON r.id = m."roundId"
+    WHERE r.season = ${season} AND r."isFinals" = false AND a.minutes > 0
+    GROUP BY a."playerId"`;
+  return rows.map(({ player_id, games, ...raw }) => ({ playerId: player_id, games, raw }));
 }
 
 /**
@@ -37,33 +67,15 @@ export function rankScore(avg: number, games: number): number {
   return (avg * games) / (games + 3);
 }
 
-/** Every player who played in the ranking season, best first. */
-export async function loadDraftPlayers(
+/** Rank players from season stats under a scoring. Best first. */
+export async function rankPlayers(
   db: PrismaClient,
-  leagueSeason: number,
+  season: number,
   scoring: ScoringRules,
 ): Promise<DraftPlayer[]> {
-  const season = await rankingSeason(db, leagueSeason);
-  if (season === null) return [];
-
-  // One aggregate over the season's appearances (games = took the field).
-  const totals = await db.$queryRaw<Totals[]>`
-    SELECT a."playerId" AS player_id,
-           COUNT(*)::int AS games,
-           SUM(a."runMetres")::int AS run_metres,
-           SUM(a.tackles)::int AS tackles,
-           SUM(a.tries)::int AS tries,
-           SUM(a."tryAssists")::int AS try_assists,
-           SUM(a.goals)::int AS goals,
-           SUM(a.errors)::int AS errors
-    FROM "Appearance" a
-    JOIN "Match" m ON m.id = a."matchId"
-    JOIN "Round" r ON r.id = m."roundId"
-    WHERE r.season = ${season} AND a.minutes > 0
-    GROUP BY a."playerId"`;
-
+  const totals = await seasonTotals(db, season);
   const players = await db.player.findMany({
-    where: { id: { in: totals.map((t) => t.player_id) } },
+    where: { id: { in: totals.map((t) => t.playerId) } },
     select: {
       id: true, firstName: true, lastName: true, positions: true, positionsOverride: true,
       club: { select: { key: true, nickName: true } },
@@ -72,16 +84,9 @@ export async function loadDraftPlayers(
   const byId = new Map(players.map((p) => [p.id, p]));
 
   const rows = totals.flatMap((t) => {
-    const p = byId.get(t.player_id);
+    const p = byId.get(t.playerId);
     if (!p) return [];
-    const total = playerPoints(
-      {
-        runMetres: t.run_metres, tackles: t.tackles, tries: t.tries,
-        tryAssists: t.try_assists, goals: t.goals, errors: t.errors,
-      },
-      scoring,
-    );
-    const avgPoints = Math.round((total / t.games) * 10) / 10;
+    const total = playerPoints(statLineFromRaw(t.raw), scoring);
     return [{
       id: p.id,
       name: `${p.firstName} ${p.lastName}`,
@@ -89,11 +94,21 @@ export async function loadDraftPlayers(
       positions: effectivePositions(p),
       statsSeason: season,
       games: t.games,
-      avgPoints,
+      avgPoints: Math.round((total / t.games) * 10) / 10,
       score: rankScore(total / t.games, t.games),
     }];
   });
 
   rows.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
   return rows.map(({ score: _score, ...r }, i) => ({ ...r, rank: i + 1 }));
+}
+
+/** Every player who played in the ranking season for a league, best first. */
+export async function loadDraftPlayers(
+  db: PrismaClient,
+  leagueSeason: number,
+  scoring: ScoringRules,
+): Promise<DraftPlayer[]> {
+  const season = await rankingSeason(db, leagueSeason);
+  return season === null ? [] : rankPlayers(db, season, scoring);
 }

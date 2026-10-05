@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { SCORING_STAT_LABELS, SCORING_STATS, squadSize, type LeagueDetail } from "@nrl/shared";
+import { squadSize, type LeagueDetail } from "@nrl/shared";
+import { scoringSummary } from "../components/ScoringEditor.tsx";
 import { AppShell } from "../components/Layout.tsx";
 import { Avatar, Button, Card, ErrorText, SectionTitle, Spinner, inputClass } from "../components/ui.tsx";
 import { useLeague, useRenameTeam } from "../lib/queries.ts";
@@ -179,17 +180,12 @@ function SettingsSummary({ league }: { league: LeagueDetail }) {
           {s.roster.slots.map((x) => `${x.count} ${x.label}`).join(", ")}, {s.roster.benchSize} bench ({squadSize(s.roster)})
         </dd>
         <dt className="text-muted">Scoring</dt>
-        <dd>
-          {SCORING_STATS.filter((k) => s.scoring[k])
-            .map((k) => `${SCORING_STAT_LABELS[k].replace(" (per metre)", "")} ${fmtPts(s.scoring[k]!)}${k === "runMetres" ? "/m" : ""}`)
-            .join(", ")}
-        </dd>
+        <dd>{scoringSummary(s.scoring) || "Nothing scores"}</dd>
       </dl>
     </Card>
   );
 }
 
-const fmtPts = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
 function formatSeconds(s: number) {
   if (s < 120) return `${s}s`;
