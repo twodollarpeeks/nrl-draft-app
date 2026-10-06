@@ -43,3 +43,23 @@ describe("stat catalogue", () => {
     expect(ScoringRules.safeParse({ minutesPlayed: 1 }).success).toBe(false);
   });
 });
+
+describe("formatStatLine", async () => {
+  const { formatStatLine, STAT_ABBR } = await import("./scoringStats.ts");
+  it("leads with metres, tackles, tries, try assists, goals, then the rest", () => {
+    expect(
+      formatStatLine([
+        { stat: "errors", value: 1 },
+        { stat: "goals", value: 2 },
+        { stat: "tries", value: 1 },
+        { stat: "tackles", value: 20 },
+        { stat: "runMetres", value: 125 },
+        { stat: "lineBreaks", value: 0 },
+      ]),
+    ).toBe("125m, 20t, 1T, 2G, 1E");
+  });
+
+  it("has a short label for every stat", () => {
+    expect(STAT_CATALOGUE.filter((s) => !STAT_ABBR[s.key]).map((s) => s.key)).toEqual([]);
+  });
+});

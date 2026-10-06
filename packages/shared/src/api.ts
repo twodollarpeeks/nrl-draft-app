@@ -2,6 +2,7 @@ import { z } from "zod";
 import { LeagueSettings } from "./leagueSettings.ts";
 import { NrlPosition } from "./positions.ts";
 import type { Lineup } from "./lineup.ts";
+import type { ScoreState } from "./matchState.ts";
 
 // Request bodies shared by the API (validation) and the web app (forms).
 
@@ -227,6 +228,8 @@ export interface PlayerRoundView {
   club: { key: string; nickName: string } | null;
   positions: NrlPosition[];
   status: "played" | "dnp" | "pending";
+  /** How settled their points are: upcoming, live, in review (stats still being checked), final. */
+  scoreState: ScoreState;
   note: PlayerNote | null;
   /** Their match has kicked off (or, on a bye, the round has): can't be moved. */
   locked: boolean;

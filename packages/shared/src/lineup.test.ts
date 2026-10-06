@@ -44,6 +44,26 @@ describe("autoLineup", () => {
   it("is a valid lineup", () => {
     expect(lineupErrors(T, squad, l)).toEqual([]);
   });
+
+  it("fills every spot when a dual-position player could go either way", () => {
+    // Best first: a 2RF/CE utility, then two forwards, a half, two outside backs.
+    // Greedy would put the utility at forward and leave an outside back spot empty.
+    const tight: SquadPlayer[] = [
+      { id: 1, positions: ["2RF", "CE"] },
+      { id: 2, positions: ["FRF"] },
+      { id: 3, positions: ["LK"] },
+      { id: 4, positions: ["HB"] },
+      { id: 5, positions: ["WG"] },
+      { id: 6, positions: ["FB"] },
+      { id: 7, positions: ["FRF"] },
+      { id: 8, positions: ["2RF"] },
+    ];
+    const r = autoLineup(T, tight);
+    const starters = Object.values(r.starters).flat();
+    expect(starters.filter((x) => x === null)).toEqual([]);
+    expect(r.starters.OB!.sort()).toEqual([1, 5, 6]);
+    expect(lineupErrors(T, tight, r)).toEqual([]);
+  });
 });
 
 describe("lineupErrors", () => {

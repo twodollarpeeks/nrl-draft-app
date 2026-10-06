@@ -107,19 +107,44 @@ export function reconcileLineup(template: RosterTemplate, squad: readonly SquadP
  * on the bench in the same order.
  */
 export function autoLineup(template: RosterTemplate, squadBestFirst: readonly SquadPlayer[]): Lineup {
-  const used = new Set<number>();
+  // Individual spots, most restrictive slot first, so flexible spots are left for later.
+  const spots = [...template.slots]
+    .sort((a, b) => a.eligible.length - b.eligible.length)
+    .flatMap((s) => Array.from({ length: s.count }, (_, i) => ({ key: s.key, index: i, eligible: s.eligible })));
+  const owner: Array<SquadPlayer | null> = spots.map(() => null);
+  const fits = (p: SquadPlayer, s: number) => p.positions.some((pos) => spots[s]!.eligible.includes(pos));
+
+  // Can p have a spot if someone already placed shuffles to another one?
+  const augment = (p: SquadPlayer, seen: boolean[]): boolean => {
+    for (let s = 0; s < spots.length; s++) {
+      if (seen[s] || !fits(p, s)) continue;
+      seen[s] = true;
+      if (owner[s] === null || augment(owner[s]!, seen)) {
+        owner[s] = p;
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Best players first: each takes a free spot if there is one, otherwise
+  // reshuffles earlier picks (who keep a spot) to make room. Because it's a
+  // maximum matching, every spot the squad can fill gets filled; the greedy
+  // version left gaps when a dual-position player took the wrong slot.
+  for (const p of squadBestFirst) {
+    if (owner.every((o) => o !== null)) break;
+    const free = spots.findIndex((_, s) => owner[s] === null && fits(p, s));
+    if (free >= 0) owner[free] = p;
+    else augment(p, spots.map(() => false));
+  }
+
   const starters: Lineup["starters"] = Object.fromEntries(
     template.slots.map((s) => [s.key, Array.from({ length: s.count }, () => null as number | null)]),
   );
-  const slots = [...template.slots].sort((a, b) => a.eligible.length - b.eligible.length);
-  for (const slot of slots) {
-    for (let i = 0; i < slot.count; i++) {
-      const p = squadBestFirst.find((x) => !used.has(x.id) && x.positions.some((pos) => slot.eligible.includes(pos)));
-      if (!p) break;
-      used.add(p.id);
-      starters[slot.key]![i] = p.id;
-    }
-  }
+  spots.forEach((s, i) => {
+    if (owner[i]) starters[s.key]![s.index] = owner[i]!.id;
+  });
+  const used = new Set(owner.filter((o) => o !== null).map((o) => o!.id));
   return { starters, bench: squadBestFirst.filter((p) => !used.has(p.id)).map((p) => p.id) };
 }
 

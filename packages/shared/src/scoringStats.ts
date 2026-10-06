@@ -95,3 +95,71 @@ export function statValue(def: StatDef, raw: Readonly<Record<string, unknown>>):
 export function statLineFromRaw(raw: Readonly<Record<string, unknown>>): Record<string, number> {
   return Object.fromEntries(STAT_CATALOGUE.map((d) => [d.key, statValue(d, raw)]));
 }
+
+// ---- Stat lines ("125m, 20t, 1T, 2G") ------------------------------------
+
+/** Short labels for a player's stat line, NFL-fantasy style. */
+export const STAT_ABBR: Record<string, string> = {
+  tries: "T",
+  goals: "G",
+  missedGoals: "MG",
+  onePointFieldGoals: "FG",
+  twoPointFieldGoals: "2FG",
+  runMetres: "m",
+  allRuns: "R",
+  postContactMetres: "PCm",
+  kickReturnMetres: "KRm",
+  lineBreaks: "LB",
+  lineBreakAssists: "LBA",
+  tryAssists: "TA",
+  tackleBreaks: "TB",
+  offloads: "OL",
+  hitUps: "HU",
+  lineEngagedRuns: "LER",
+  dummyHalfRuns: "DHR",
+  dummyHalfRunMetres: "DHm",
+  playTheBalls: "PTB",
+  passes: "P",
+  dummyPasses: "DP",
+  receipts: "Rec",
+  tackles: "t",
+  missedTackles: "MT",
+  ineffectiveTackles: "IT",
+  intercepts: "Int",
+  kicksDefused: "KD",
+  oneOnOneSteals: "Stl",
+  kicks: "K",
+  kickMetres: "Km",
+  forcedDropOuts: "FDO",
+  fortyTwenties: "40/20",
+  twentyForties: "20/40",
+  bombKicks: "Bomb",
+  grubberKicks: "Grub",
+  crossFieldKicks: "CFK",
+  kicksDead: "KDd",
+  errors: "E",
+  handlingErrors: "HE",
+  oneOnOneLost: "1v1L",
+  penalties: "Pen",
+  ruckInfringements: "Ruck",
+  inside10Metres: "10m",
+  onReport: "Rep",
+  sinBins: "SB",
+  sendOffs: "SO",
+};
+
+// The headline stats lead the line; anything else follows in catalogue order.
+const STAT_LINE_LEAD = ["runMetres", "tackles", "tries", "tryAssists", "goals"];
+
+/** "125m, 20t, 1T, 2G" from a player's scored stats (zeros left out). */
+export function formatStatLine(stats: ReadonlyArray<{ stat: string; value: number }>): string {
+  const rank = (stat: string) => {
+    const lead = STAT_LINE_LEAD.indexOf(stat);
+    return lead >= 0 ? lead : STAT_LINE_LEAD.length + STAT_CATALOGUE.findIndex((s) => s.key === stat);
+  };
+  return [...stats]
+    .filter((s) => s.value !== 0)
+    .sort((a, b) => rank(a.stat) - rank(b.stat))
+    .map((s) => `${Number.isInteger(s.value) ? s.value : s.value.toFixed(1)}${STAT_ABBR[s.stat] ?? s.stat}`)
+    .join(", ");
+}

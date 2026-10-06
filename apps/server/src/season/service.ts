@@ -14,6 +14,7 @@ import {
   LeagueSettings,
   autoLineup,
   effectivePositions,
+  matchScoreState,
   lineupErrors,
   movedLockedPlayers,
   reconcileLineup,
@@ -26,6 +27,7 @@ import {
   type PlayerNote,
   type PlayerRoundView,
   type RoundStatus,
+  type ScoreState,
   type RoundView,
   type SeasonOverview,
   type SquadPlayer,
@@ -150,8 +152,9 @@ export class SeasonService {
         away: { id: m.awayClub.id, key: m.awayClub.key, nickName: m.awayClub.nickName },
       }));
       const kickoffs = matches.map((m) => m.kickoffAt.getTime());
+      // A round is final once every game is past the stats review window.
       const status: RoundStatus =
-        matches.length > 0 && matches.every((m) => m.state === "FullTime")
+        matches.length > 0 && matches.every((m) => matchScoreState(m, now) === "final")
           ? "complete"
           : kickoffs.some((k) => k <= now.getTime())
             ? "live"
@@ -263,6 +266,14 @@ export class SeasonService {
     // A bye player locks with the round's first game; anyone else at their own kickoff.
     const locked = match ? matchStarted : bye ? !!round?.firstKickoff && round.firstKickoff <= now : false;
 
+    const scoreState: ScoreState = match
+      ? matchScoreState(match, now)
+      : round?.status === "complete"
+        ? "final"
+        : round?.status === "live"
+          ? "live"
+          : "upcoming";
+
     const result: PlayerRoundResult = { status, points: points ?? 0, positions: player.positions };
     const view: PlayerRoundView = {
       id: player.id,
@@ -270,6 +281,7 @@ export class SeasonService {
       club: player.club ? { key: player.club.key, nickName: player.club.nickName } : null,
       positions: player.positions,
       status,
+      scoreState,
       note,
       locked,
       jersey: app?.jersey ?? null,

@@ -228,6 +228,18 @@ describe.runIf(hasTestDb)("season play", () => {
       expect(res.body.editable).toBe(false);
     });
 
+    it("keeps a round in review for a day after full time before it counts", async () => {
+      clock = new Date(kickoff(10).getTime() + 3 * 3_600_000); // round 10: full time, stats in review
+      const r10 = (await teamRound(0, 0, 10)).body;
+      expect(r10.roundStatus).toBe("live");
+      expect(r10.score.provisional).toBe(true);
+      expect(r10.players.find((p) => p.id === 1)?.scoreState).toBe("review");
+      expect((await teamRound(0, 0, 9)).body.players.find((p) => p.id === 1)?.scoreState).toBe("final");
+      const o = (await call<SeasonOverview>(users[0]!.id, "GET", `/api/leagues/${leagueId}/season`)).body;
+      expect(o.ladder.every((r) => r.played === 9)).toBe(true);
+      expect(o.currentRound).toBe(10);
+    });
+
     it("can't change a finished round", async () => {
       const url = `/api/leagues/${leagueId}/teams/${teamIds[0]}/rounds/3/lineup`;
       expect((await call(users[0]!.id, "PUT", url, { starters: { HB_HK: [1], FWD: [2], OB: [4] }, bench: [3] })).body).toMatchObject({ error: "round_over" });
