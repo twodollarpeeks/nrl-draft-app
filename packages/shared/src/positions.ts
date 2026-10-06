@@ -37,3 +37,23 @@ export function effectivePositions(p: {
   const list = p.positionsOverride.length > 0 ? p.positionsOverride : p.positions;
   return list.filter((x): x is NrlPosition => (NRL_POSITIONS as readonly string[]).includes(x));
 }
+
+/** Colour/grouping bucket for a position: halves & hookers, forwards, outside backs. */
+export type PositionGroup = "half" | "fwd" | "ob";
+
+const GROUP_OF: Record<NrlPosition, PositionGroup> = {
+  HB: "half", FE: "half", HK: "half",
+  FRF: "fwd", "2RF": "fwd", LK: "fwd",
+  FB: "ob", WG: "ob", CE: "ob",
+};
+
+export const POSITION_GROUP_LABELS: Record<PositionGroup, string> = {
+  half: "Halves & hookers",
+  fwd: "Forwards",
+  ob: "Outside backs",
+};
+
+/** The group of a player's first-listed position (null if they have none). */
+export function positionGroup(positions: readonly NrlPosition[]): PositionGroup | null {
+  return positions[0] ? GROUP_OF[positions[0]] : null;
+}

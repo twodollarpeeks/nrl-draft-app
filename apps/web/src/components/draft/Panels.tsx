@@ -8,6 +8,7 @@ import {
   type NrlPosition,
   type RosterTemplate,
 } from "@nrl/shared";
+import { PositionBadge, PositionLegend, groupStyle } from "../Position.tsx";
 
 export function QueuePanel({
   queue,
@@ -44,7 +45,7 @@ export function QueuePanel({
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium">{p?.name ?? `Player ${id}`}</div>
               <div className="text-xs text-muted">
-                {p?.positions.join("/")} · {p?.club?.nickName}
+                {p && <PositionBadge positions={p.positions} />} {p?.club?.nickName}
               </div>
             </div>
             <button className="size-9 rounded-lg text-muted hover:text-text disabled:opacity-30" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move ${p?.name} up`}>
@@ -78,6 +79,8 @@ export function BoardPanel({
   const byPick = new Map(state.picks.map((p) => [p.pickNo, p]));
   const n = state.order.length;
   return (
+    <div className="flex flex-col gap-2">
+    <PositionLegend />
     <div className="-mx-4 overflow-x-auto px-4">
       <table className="border-separate border-spacing-1 text-xs">
         <thead>
@@ -110,9 +113,9 @@ export function BoardPanel({
                 return (
                   <td
                     key={t.id}
-                    className={`h-12 w-28 min-w-28 rounded-lg px-2 align-top ${
+                    className={`h-12 w-28 min-w-28 rounded-lg border-l-4 px-2 align-top ${
                       current ? "ring-2 ring-accent" : ""
-                    } ${pick ? (pick.madeBy === "autopick" ? "bg-surface-2/60" : "bg-surface") : "bg-surface/40"}`}
+                    } ${p ? groupStyle(p.positions).cell : "border-l-transparent bg-surface/40"}`}
                   >
                     <div className="font-mono text-[10px] text-muted">
                       {roundOf(n, pickNo)}.{inRound + 1}
@@ -121,7 +124,7 @@ export function BoardPanel({
                     {p && (
                       <>
                         <div className="truncate font-medium">{p.name}</div>
-                        <div className="text-[10px] text-muted">{p.positions.join("/")}</div>
+                        <div className="text-[10px] font-semibold text-muted">{p.positions.join("/") || "No pos"}</div>
                       </>
                     )}
                   </td>
@@ -131,6 +134,7 @@ export function BoardPanel({
           ))}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }
@@ -182,7 +186,7 @@ export function TeamPanel({
             <li key={p.id} className="flex items-center justify-between px-3 py-2">
               <span className="truncate text-sm font-medium">{p.name}</span>
               <span className="text-xs text-muted">
-                {p.positions.join("/")} · {p.club?.nickName}
+                <PositionBadge positions={p.positions} /> {p.club?.nickName}
               </span>
             </li>
           ))}

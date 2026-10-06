@@ -67,8 +67,16 @@ export function MatchupsPage() {
 
 export function MatchupCard({ leagueId, matchup, myTeamId }: { leagueId: string; matchup: MatchupView; myTeamId: string }) {
   const mine = matchup.home?.teamId === myTeamId || matchup.away?.teamId === myTeamId;
+  const both = matchup.home && matchup.away;
   return (
-    <Card className={mine ? "border-accent/60" : ""}>
+    <Card className={`relative ${mine ? "border-accent/60" : ""}`}>
+      {both && (
+        <Link
+          to={`/l/${leagueId}/matchup/${matchup.round}/${matchup.home!.teamId}/${matchup.away!.teamId}`}
+          className="absolute inset-0 z-0 rounded-2xl"
+          aria-label={`Open ${matchup.home!.name} v ${matchup.away!.name}`}
+        />
+      )}
       {matchup.stage !== "regular" && <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{matchup.label}</div>}
       <div className="flex flex-col divide-y divide-border">
         {[matchup.home, matchup.away].map((side, i) =>
@@ -79,6 +87,7 @@ export function MatchupCard({ leagueId, matchup, myTeamId }: { leagueId: string;
               round={matchup.round}
               side={side}
               mine={side.teamId === myTeamId}
+              asLink={!both}
               won={matchup.winnerTeamId === side.teamId}
               lost={matchup.winnerTeamId !== null && matchup.winnerTeamId !== side.teamId}
             />
@@ -94,6 +103,7 @@ export function MatchupCard({ leagueId, matchup, myTeamId }: { leagueId: string;
 }
 
 function TeamLine({
+  asLink = true,
   leagueId,
   round,
   side,
@@ -106,12 +116,13 @@ function TeamLine({
   round: number;
   side: MatchupSide;
   mine: boolean;
+  asLink?: boolean;
   rank?: number;
   won?: boolean;
   lost?: boolean;
 }) {
-  return (
-    <Link to={`/l/${leagueId}/team/${side.teamId}/${round}`} className="flex items-center gap-3 py-2">
+  const content = (
+    <>
       {rank !== undefined && <span className="w-5 text-right font-mono text-xs text-muted">{rank}</span>}
       <span className="min-w-0 flex-1">
         <span className={`block truncate font-medium ${mine ? "text-accent" : ""} ${lost ? "text-muted" : ""}`}>
@@ -120,6 +131,14 @@ function TeamLine({
         <span className="block truncate text-xs text-muted">{side.ownerName}</span>
       </span>
       <span className={`font-mono text-2xl font-bold tabular-nums ${lost ? "text-muted" : ""}`}>{formatPoints(side.score)}</span>
+    </>
+  );
+  // Inside a matchup card the whole card is the link, so the row is just text.
+  return asLink ? (
+    <Link to={`/l/${leagueId}/team/${side.teamId}/${round}`} className="flex items-center gap-3 py-2">
+      {content}
     </Link>
+  ) : (
+    <div className="pointer-events-none relative flex items-center gap-3 py-2">{content}</div>
   );
 }

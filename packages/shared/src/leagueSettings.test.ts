@@ -88,3 +88,13 @@ describe("finals size", () => {
     expect(LeagueSettings.safeParse({ ...DEFAULT_LEAGUE_SETTINGS, teamCount: 19 }).success).toBe(false);
   });
 });
+
+describe("positionGroup", async () => {
+  const { positionGroup } = await import("./positions.ts");
+  it("groups by the first-listed position", () => {
+    expect(positionGroup(["FE"])).toBe("half");
+    expect(positionGroup(["LK", "HK"])).toBe("fwd");
+    expect(positionGroup(["CE", "2RF"])).toBe("ob");
+    expect(positionGroup([])).toBeNull();
+  });
+});

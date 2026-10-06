@@ -14,6 +14,7 @@ import {
   type TeamRoundView,
 } from "@nrl/shared";
 import { AppShell } from "../components/Layout.tsx";
+import { PositionBadge } from "../components/Position.tsx";
 import { LeagueNav, RoundPicker } from "../components/LeagueNav.tsx";
 import { Button, Card, ErrorText, SectionTitle, Spinner } from "../components/ui.tsx";
 import { useLeague } from "../lib/queries.ts";
@@ -267,9 +268,8 @@ function PlayerRow({
             {player.locked && <span aria-label="Locked">🔒</span>}
           </span>
           <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted">
-            <span>
-              {player.club?.nickName ?? "—"} · {player.positions.join("/") || "No position"}
-            </span>
+            <PositionBadge positions={player.positions} />
+            <span>{player.club?.nickName ?? "—"}</span>
             {player.match && <MatchLine match={player.match} />}
             {player.note && (
               <span className={`rounded px-1.5 py-0.5 font-semibold ${player.note === "reserve" ? "bg-surface-2" : "bg-danger/15 text-danger"}`}>

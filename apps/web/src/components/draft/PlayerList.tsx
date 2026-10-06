@@ -6,6 +6,7 @@ import {
   type NrlPosition,
   type RosterTemplate,
 } from "@nrl/shared";
+import { PositionBadge } from "../Position.tsx";
 import { inputClass } from "../ui.tsx";
 
 const PAGE = 60;
@@ -95,7 +96,7 @@ export function PlayerList({
                 <div className="truncate font-medium">{p.name}</div>
                 <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted">
                   <span>{p.club?.nickName ?? "—"}</span>
-                  <span className="font-semibold text-text">{p.positions.join("/") || "No position"}</span>
+                  <PositionBadge positions={p.positions} />
                   <span>
                     {p.avgPoints} avg · {p.games} gm
                   </span>
