@@ -1,0 +1,35 @@
+name: Wake API for drafts
+
+# Render's free plan sleeps when idle. Before and during drafts, keep the API
+# awake so the draft clock and scheduled starts run on time.
+# Needs repository secrets DATABASE_URL and API_URL (the Render service URL).
+#
+# Off by default: every 10 minutes is ~4,400 Actions minutes a month, over the
+# free allowance for a private repo (fine for a public one). The recommended
+# setup is a free uptime monitor pinging /health instead (see README). To use
+# this instead, uncomment the schedule.
+
+on:
+  # schedule:
+  #   - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: wake
+  cancel-in-progress: true
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run wake
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          API_URL: ${{ secrets.API_URL }}

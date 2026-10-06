@@ -1,0 +1,33 @@
+# Render Blueprint: the API and draft-room server (free plan).
+# Secrets (sync: false) are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: nrl-draft-api
+    runtime: node
+    plan: free
+    region: singapore # nearest Render region to Australia
+    # Dev dependencies too: the Prisma CLI runs the migrations.
+    buildCommand: npm ci --include=dev && npm run db:deploy
+    startCommand: npm run start -w @nrl/server
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: BETTER_AUTH_URL
+        sync: false # the Vercel site's URL, e.g. https://nrl-draft.vercel.app
+      - key: WEB_ORIGIN
+        sync: false # same as BETTER_AUTH_URL
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false

@@ -34,6 +34,8 @@ export interface AppDeps {
 export async function buildApp({ env, db, auth, getUser, draft, leagues, season, realtime = false }: AppDeps) {
   const app = Fastify({
     logger: env.NODE_ENV === "test" ? false : { level: "info" },
+    // Behind Render's proxy (and Vercel's rewrites): trust X-Forwarded-*.
+    trustProxy: true,
   });
   const origins = env.WEB_ORIGIN.split(",").map((o) => o.trim());
 

@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import { fileURLToPath } from "node:url";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 
 // .env lives at the repo root, not in this package.
 config({ path: fileURLToPath(new URL("../../.env", import.meta.url)), quiet: true });
@@ -12,7 +12,9 @@ export default defineConfig({
   },
   // The CLI (migrations) needs Neon's direct, unpooled connection. The app
   // itself connects through the pooled DATABASE_URL (see src/index.ts).
+  // Generating the client needs no database, so builds without one (the web
+  // app on Vercel) still work; migrations fail clearly if it's missing.
   datasource: {
-    url: env("DIRECT_URL"),
+    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? "",
   },
 });

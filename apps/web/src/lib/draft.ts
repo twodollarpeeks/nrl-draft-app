@@ -41,7 +41,9 @@ export function useDraftState(leagueId: string) {
   });
 
   useEffect(() => {
-    const socket = io({ path: "/socket.io", withCredentials: true, transports: ["websocket", "polling"] });
+    // Polling first: in production the site's host forwards plain HTTP to the
+    // API but not WebSocket upgrades. Socket.io upgrades where it can (dev).
+    const socket = io({ path: "/socket.io", withCredentials: true, transports: ["polling", "websocket"] });
     const join = () => socket.emit(DRAFT_EVENTS.join, { leagueId });
     socket.on("connect", () => {
       setConnection("live");

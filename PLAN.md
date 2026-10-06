@@ -65,19 +65,20 @@ when a decision changes.
 - Schedule: GitHub Actions runs `nrl:import --current` (current + previous
   round) Tue/Wed for team lists and hourly on match days.
 
-## Milestones
+## Milestones (all done)
 
 1. Scaffold: workspaces, TypeScript, Vitest, CI, README.
-2. Data: Prisma schema for NRL data, CSV importer, live scraper (team lists,
-   draw, match stats), raw scrape storage, re-runnable per round.
-3. Scoring package: player points, team scores with emergencies, ladder and
-   tiebreakers, fixtures, finals. Pure and unit tested.
-4. Auth and leagues: Google login, profile, create/join via invite, settings.
-5. Draft room: server-authoritative engine, Socket.io, queue, autopick,
-   commissioner tools, reconnect handling.
-6. Season play: lineups with locks, byes and emergencies, weekly scoring,
-   matchups, ladder, finals.
-7. Seed script and sample league, README, deploy.
+2. Data: Prisma schema for NRL data, nrl.com importer, raw scrape storage,
+   re-runnable per round, scheduled import.
+3. Scoring package: points, emergencies, fixtures, ladder, finals.
+4. Auth and leagues: Google login, profile, create/join via invite, settings,
+   site admin (scoring, permissions, player positions).
+5. Draft room: server-authoritative engine, live sockets, queue, autopick,
+   commissioner tools, reconnects, scheduled start, draft order.
+6. Season: lineups with kickoff locks, byes and emergencies, live scoring with
+   a 24h stats review, matchups (side by side), ladder, top 4/6/8 finals.
+7. Seed script and sample league, README, deployment config (Render, Vercel,
+   GitHub Actions).
 
 ## Post-MVP
 
