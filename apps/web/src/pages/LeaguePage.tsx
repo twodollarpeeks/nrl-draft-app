@@ -165,8 +165,8 @@ function SettingsSummary({ league }: { league: LeagueDetail }) {
   const format =
     s.matchups.mode === "totalPoints"
       ? "Total points"
-      : s.matchups.finalsTeams === 4
-        ? "Head-to-head, top 4 finals"
+      : s.matchups.finalsTeams > 0
+        ? `Head-to-head, top ${s.matchups.finalsTeams} finals`
         : "Head-to-head, no finals";
   return (
     <Card>
@@ -202,7 +202,7 @@ function SettingsSummary({ league }: { league: LeagueDetail }) {
 function seasonText(s: LeagueDetail["settings"]) {
   const r = seasonRounds(s.seasonEndRound, s.matchups);
   return r.grandFinalRound
-    ? `Rounds 1–${r.lastRegularRound}, semis round ${r.semiFinalRound}, grand final round ${r.grandFinalRound}`
+    ? `Rounds 1–${r.lastRegularRound}, finals rounds ${r.finalsStartRound}–${r.grandFinalRound} (grand final round ${r.grandFinalRound})`
     : `Rounds 1–${r.lastRegularRound}`;
 }
 

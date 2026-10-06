@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@nrl/db";
 import {
   LeagueSettings,
   checkDraftable,
+  fitFinalsToTeams,
   chooseAutopick,
   roundOf,
   squadSize,
@@ -173,7 +174,12 @@ export class DraftEngine {
       const stored = league.draftOrder;
       const usable = stored.length === teamIds.length && teamIds.every((id) => stored.includes(id));
       const order = usable ? stored : shuffleArray(teamIds);
-      const settings = { ...league.settings, teamCount: order.length };
+      // The league is whoever joined; finals can't be bigger than that.
+      const matchups =
+        league.settings.matchups.mode === "headToHead"
+          ? { ...league.settings.matchups, finalsTeams: fitFinalsToTeams(league.settings.matchups.finalsTeams, order.length) }
+          : league.settings.matchups;
+      const settings = { ...league.settings, teamCount: order.length, matchups };
       // Lock in the league: its size is whoever joined, and rules can't change.
       await tx.league.update({ where: { id: leagueId }, data: { status: "drafting", settings, draftOrder: order } });
       await tx.auditLog.create({ data: { leagueId, actorId, action: "draft.start", payload: { order, scheduled: actorId === null } } });

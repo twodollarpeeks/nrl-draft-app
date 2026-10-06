@@ -27,10 +27,15 @@ when a decision changes.
 - **Non-playing starters:** ordered emergencies. The first bench player in the
   manager's emergency order who is eligible for the slot and played comes in.
 - **Lineup lock:** per player at their match's kickoff.
-- **Leagues:** 4-12 teams, default 8. Head-to-head with top-4 finals or no
-  finals, or a total-points ladder. Commissioners choose the round the season
+- **Leagues:** 4-18 teams, default 8. Head-to-head with finals (top 4, 6 or
+  8) or no finals, or a total-points ladder. Top 4: semis 1v4, 2v3, grand
+  final. Top 6: 1v6, 2v5, 3v4, then the winners and best-ranked loser
+  re-seeded into semis, grand final. Top 8: the NRL system (qualifying and
+  elimination finals, semis, preliminary finals, grand final). Higher seed
+  hosts and wins draws. Finals shrink to fit if fewer teams join. Commissioners choose the round the season
   ends (12-27, default 27), because playoff-bound clubs rest players late: the
-  grand final with finals (semis the round before), otherwise the last round.
+  grand final with finals (2, 3 or 4 finals weeks before it), otherwise the
+  last round.
 - **Ladder ties:** wins (draw = half), points for, head-to-head, points against.
 - **Ownership:** a player is on at most one team per league; a user can be in
   many leagues.

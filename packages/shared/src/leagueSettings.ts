@@ -96,10 +96,18 @@ export const DEFAULT_DRAFT: DraftSettings = { type: "snake", pickSeconds: 60 };
 export const Tiebreaker = z.enum(["pointsFor", "headToHead", "pointsAgainst"]);
 export type Tiebreaker = z.infer<typeof Tiebreaker>;
 
+/** Teams in the finals: 0 = no finals. */
+export const FINALS_SIZES = [4, 6, 8] as const;
+export const FinalsTeams = z.union([z.literal(0), z.literal(4), z.literal(6), z.literal(8)]);
+export type FinalsTeams = z.infer<typeof FinalsTeams>;
+
+/** Weeks of finals for each size, ending with the grand final. */
+export const FINALS_WEEKS: Record<FinalsTeams, number> = { 0: 0, 4: 2, 6: 3, 8: 4 };
+
 export const MatchupSettings = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("headToHead"),
-    finalsTeams: z.union([z.literal(0), z.literal(4)]),
+    finalsTeams: FinalsTeams,
     tiebreakers: z.array(Tiebreaker),
   }),
   z.object({ mode: z.literal("totalPoints") }),
@@ -118,9 +126,6 @@ export const DEFAULT_MATCHUPS: MatchupSettings = {
 export const NRL_LAST_ROUND = 27;
 /** Shortest fantasy season allowed, so there's a real regular season before any finals. */
 export const MIN_SEASON_END_ROUND = 12;
-/** Top-4 finals take two rounds: semi-finals, then the grand final. */
-export const FINALS_ROUNDS = 2;
-
 export const SeasonEndRound = z.number().int().min(MIN_SEASON_END_ROUND).max(NRL_LAST_ROUND);
 
 /**
@@ -129,28 +134,42 @@ export const SeasonEndRound = z.number().int().min(MIN_SEASON_END_ROUND).max(NRL
  * head-to-head with finals, otherwise the final round.
  */
 export function seasonRounds(endRound: number, matchups: MatchupSettings) {
-  const finals = matchups.mode === "headToHead" && matchups.finalsTeams === 4;
+  const weeks = matchups.mode === "headToHead" ? FINALS_WEEKS[matchups.finalsTeams] : 0;
   return {
-    lastRegularRound: finals ? endRound - FINALS_ROUNDS : endRound,
-    semiFinalRound: finals ? endRound - 1 : null,
-    grandFinalRound: finals ? endRound : null,
+    lastRegularRound: endRound - weeks,
+    /** First round of finals, or null with no finals. */
+    finalsStartRound: weeks ? endRound - weeks + 1 : null,
+    grandFinalRound: weeks ? endRound : null,
+    finalsWeeks: weeks,
   };
+}
+
+/** The biggest finals format (at most `wanted`) that a league of `teams` can hold. */
+export function fitFinalsToTeams(wanted: FinalsTeams, teams: number): FinalsTeams {
+  if (wanted <= teams) return wanted;
+  const fits = FINALS_SIZES.filter((n) => n <= teams);
+  return fits.length ? fits[fits.length - 1]! : 0;
 }
 
 // ---- Whole league -------------------------------------------------------------
 
 export const MIN_TEAMS = 4;
-export const MAX_TEAMS = 12;
+export const MAX_TEAMS = 18;
 
-export const LeagueSettings = z.object({
-  teamCount: z.number().int().min(MIN_TEAMS).max(MAX_TEAMS),
-  roster: RosterTemplate,
-  scoring: ScoringRules,
-  draft: DraftSettings,
-  matchups: MatchupSettings,
-  // Leagues created before this setting existed ran the full season.
-  seasonEndRound: SeasonEndRound.default(NRL_LAST_ROUND),
-});
+export const LeagueSettings = z
+  .object({
+    teamCount: z.number().int().min(MIN_TEAMS).max(MAX_TEAMS),
+    roster: RosterTemplate,
+    scoring: ScoringRules,
+    draft: DraftSettings,
+    matchups: MatchupSettings,
+    // Leagues created before this setting existed ran the full season.
+    seasonEndRound: SeasonEndRound.default(NRL_LAST_ROUND),
+  })
+  .refine((s) => s.matchups.mode !== "headToHead" || s.matchups.finalsTeams <= s.teamCount, {
+    message: "More finals teams than teams in the league",
+    path: ["matchups", "finalsTeams"],
+  });
 export type LeagueSettings = z.infer<typeof LeagueSettings>;
 
 export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {

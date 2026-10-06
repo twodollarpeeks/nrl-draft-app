@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_LEAGUE_SETTINGS,
+  fitFinalsToTeams,
   seasonRounds,
   DEFAULT_ROSTER_TEMPLATE,
   LeagueSettings,
@@ -34,8 +35,8 @@ describe("league settings", () => {
     expect(RosterTemplate.safeParse(bad).success).toBe(false);
   });
 
-  it("rejects league sizes outside 4-12", () => {
-    for (const teamCount of [3, 13]) {
+  it("rejects league sizes outside 4-18", () => {
+    for (const teamCount of [3, 19]) {
       const r = LeagueSettings.safeParse({ ...DEFAULT_LEAGUE_SETTINGS, teamCount });
       expect(r.success).toBe(false);
     }
@@ -54,13 +55,36 @@ describe("league settings", () => {
 });
 
 describe("seasonRounds", () => {
-  it("puts top-4 finals in the last two rounds, ending at the chosen grand final", () => {
-    expect(seasonRounds(27, DEFAULT_LEAGUE_SETTINGS.matchups)).toEqual({ lastRegularRound: 25, semiFinalRound: 26, grandFinalRound: 27 });
-    expect(seasonRounds(24, DEFAULT_LEAGUE_SETTINGS.matchups)).toEqual({ lastRegularRound: 22, semiFinalRound: 23, grandFinalRound: 24 });
+  const h2h = (finalsTeams: 0 | 4 | 6 | 8) => ({ mode: "headToHead" as const, finalsTeams, tiebreakers: [] });
+
+  it("ends the regular season before the finals weeks, with the grand final at the chosen round", () => {
+    expect(seasonRounds(27, h2h(4))).toEqual({ lastRegularRound: 25, finalsStartRound: 26, grandFinalRound: 27, finalsWeeks: 2 });
+    expect(seasonRounds(24, h2h(6))).toEqual({ lastRegularRound: 21, finalsStartRound: 22, grandFinalRound: 24, finalsWeeks: 3 });
+    expect(seasonRounds(27, h2h(8))).toEqual({ lastRegularRound: 23, finalsStartRound: 24, grandFinalRound: 27, finalsWeeks: 4 });
   });
 
-  it("ends the regular season at the chosen round without finals", () => {
-    expect(seasonRounds(25, { mode: "totalPoints" })).toEqual({ lastRegularRound: 25, semiFinalRound: null, grandFinalRound: null });
-    expect(seasonRounds(25, { mode: "headToHead", finalsTeams: 0, tiebreakers: [] }).lastRegularRound).toBe(25);
+  it("ends at the chosen round without finals", () => {
+    expect(seasonRounds(25, { mode: "totalPoints" })).toMatchObject({ lastRegularRound: 25, finalsStartRound: null, grandFinalRound: null });
+    expect(seasonRounds(25, h2h(0)).lastRegularRound).toBe(25);
+  });
+});
+
+describe("finals size", () => {
+  it("can't exceed the number of teams", () => {
+    const s = { ...DEFAULT_LEAGUE_SETTINGS, teamCount: 6, matchups: { mode: "headToHead" as const, finalsTeams: 8 as const, tiebreakers: [] } };
+    expect(LeagueSettings.safeParse(s).success).toBe(false);
+    expect(LeagueSettings.safeParse({ ...s, teamCount: 8 }).success).toBe(true);
+  });
+
+  it("shrinks to the biggest format that fits", () => {
+    expect(fitFinalsToTeams(8, 10)).toBe(8);
+    expect(fitFinalsToTeams(8, 7)).toBe(6);
+    expect(fitFinalsToTeams(6, 5)).toBe(4);
+    expect(fitFinalsToTeams(4, 3)).toBe(0);
+  });
+
+  it("allows leagues of up to 18 teams", () => {
+    expect(LeagueSettings.safeParse({ ...DEFAULT_LEAGUE_SETTINGS, teamCount: 18 }).success).toBe(true);
+    expect(LeagueSettings.safeParse({ ...DEFAULT_LEAGUE_SETTINGS, teamCount: 19 }).success).toBe(false);
   });
 });

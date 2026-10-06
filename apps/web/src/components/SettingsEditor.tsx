@@ -1,7 +1,9 @@
 import {
   MAX_TEAMS,
   MIN_TEAMS,
+  FINALS_SIZES,
   MIN_SEASON_END_ROUND,
+  fitFinalsToTeams,
   NRL_LAST_ROUND,
   seasonRounds,
   squadSize,
@@ -12,6 +14,8 @@ import {
 } from "@nrl/shared";
 import type { ReactNode } from "react";
 import { ScoringEditor, scoringSummary } from "./ScoringEditor.tsx";
+
+type FinalsSize = (typeof FINALS_SIZES)[number];
 import { Card, SectionTitle, inputClass } from "./ui.tsx";
 
 /** What the site lets this user change (from /api/league-defaults). */
@@ -36,15 +40,23 @@ type MatchupChoice = "h2hFinals" | "h2h" | "total";
 
 function matchupChoice(m: MatchupSettings): MatchupChoice {
   if (m.mode === "totalPoints") return "total";
-  return m.finalsTeams === 4 ? "h2hFinals" : "h2h";
+  return m.finalsTeams > 0 ? "h2hFinals" : "h2h";
 }
 
-function matchupsFor(choice: MatchupChoice, current: MatchupSettings): MatchupSettings {
+function matchupsFor(choice: MatchupChoice, current: MatchupSettings, teamCount: number): MatchupSettings {
   const tiebreakers =
     current.mode === "headToHead" ? current.tiebreakers : (["pointsFor", "headToHead", "pointsAgainst"] as const);
   if (choice === "total") return { mode: "totalPoints" };
-  return { mode: "headToHead", finalsTeams: choice === "h2hFinals" ? 4 : 0, tiebreakers: [...tiebreakers] };
+  if (choice === "h2h") return { mode: "headToHead", finalsTeams: 0, tiebreakers: [...tiebreakers] };
+  const keep = current.mode === "headToHead" && current.finalsTeams > 0 ? current.finalsTeams : 4;
+  return { mode: "headToHead", finalsTeams: fitFinalsToTeams(keep, teamCount), tiebreakers: [...tiebreakers] };
 }
+
+const FINALS_DESCRIPTIONS: Record<FinalsSize, string> = {
+  4: "Semi-finals 1v4, 2v3, then the grand final",
+  6: "1v6, 2v5, 3v4; the winners and the best-ranked loser play semis, then the grand final",
+  8: "NRL system: top 4 get a second chance. Qualifying, elimination, semi and preliminary finals, then the grand final",
+};
 
 export function SettingsEditor({
   value,
@@ -73,7 +85,17 @@ export function SettingsEditor({
               value={value.teamCount}
               min={Math.max(MIN_TEAMS, minTeams)}
               max={MAX_TEAMS}
-              onChange={(n) => set("teamCount", n)}
+              onChange={(n) =>
+                onChange({
+                  ...value,
+                  teamCount: n,
+                  // Fewer teams than finals spots: shrink the finals to fit.
+                  matchups:
+                    value.matchups.mode === "headToHead"
+                      ? { ...value.matchups, finalsTeams: fitFinalsToTeams(value.matchups.finalsTeams, n) }
+                      : value.matchups,
+                })
+              }
             />
           </Row>
           <Row label="Pick timer" hint={can.draftTimer ? undefined : LOCKED}>
@@ -97,7 +119,7 @@ export function SettingsEditor({
             <legend className="mb-2 text-sm font-medium">Format{can.format ? "" : ` · ${LOCKED}`}</legend>
             {(
               [
-                ["h2hFinals", "Head-to-head + top 4 finals", "Weekly matchups; semis round 26, grand final round 27"],
+                ["h2hFinals", "Head-to-head + finals", "Weekly matchups, then a finals series"],
                 ["h2h", "Head-to-head, no finals", "Top of the ladder after the season wins"],
                 ["total", "Total points", "No matchups; most points over the season wins"],
               ] as const
@@ -112,11 +134,35 @@ export function SettingsEditor({
                   disabled={!can.format}
                   className="mt-1 accent-(--color-accent)"
                   checked={matchupChoice(value.matchups) === choice}
-                  onChange={() => set("matchups", matchupsFor(choice, value.matchups))}
+                  onChange={() => set("matchups", matchupsFor(choice, value.matchups, value.teamCount))}
                 />
-                <span>
+                <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium">{label}</span>
                   <span className="block text-xs text-muted">{hint}</span>
+                  {choice === "h2hFinals" && value.matchups.mode === "headToHead" && value.matchups.finalsTeams > 0 && (
+                    <span className="mt-2 flex flex-col gap-1">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-sm">Finals teams</span>
+                        <select
+                          className={inputClass}
+                          aria-label="Number of finals teams"
+                          disabled={!can.format}
+                          value={value.matchups.finalsTeams}
+                          onChange={(e) =>
+                            set("matchups", { ...value.matchups, finalsTeams: Number(e.target.value) as FinalsSize } as MatchupSettings)
+                          }
+                        >
+                          {FINALS_SIZES.map((n) => (
+                            <option key={n} value={n} disabled={n > value.teamCount}>
+                              Top {n}
+                              {n > value.teamCount ? ` (needs ${n}+ teams)` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </span>
+                      <span className="text-xs text-muted">{FINALS_DESCRIPTIONS[value.matchups.finalsTeams as FinalsSize]}</span>
+                    </span>
+                  )}
                 </span>
               </label>
             ))}
@@ -194,7 +240,7 @@ function SeasonEnd({
 }) {
   const r = seasonRounds(value.seasonEndRound, value.matchups);
   const hint = r.grandFinalRound
-    ? `Regular season rounds 1–${r.lastRegularRound}, semi-finals round ${r.semiFinalRound}, grand final round ${r.grandFinalRound}`
+    ? `Regular season rounds 1–${r.lastRegularRound}, finals rounds ${r.finalsStartRound}–${r.grandFinalRound} (grand final round ${r.grandFinalRound})`
     : `Rounds 1–${r.lastRegularRound}`;
   const rounds = Array.from({ length: NRL_LAST_ROUND - MIN_SEASON_END_ROUND + 1 }, (_, i) => NRL_LAST_ROUND - i);
   return (
