@@ -4,6 +4,7 @@ import { Navigate } from "react-router";
 import {
   DEFAULT_SCORING,
   SCORING_STATS,
+  groupsLabel,
   type CommissionerPermissions,
   type ScoringPreview,
   type ScoringRules,
@@ -227,7 +228,7 @@ function Preview({ scoring }: { scoring: ScoringRules }) {
                 <li key={t.rank} className="flex items-center gap-3 py-1.5">
                   <span className="w-6 text-right font-mono text-xs text-muted">{t.rank}</span>
                   <span className="min-w-0 flex-1 truncate">{t.name}</span>
-                  <span className="text-xs text-muted">{t.positions.join("/")}</span>
+                  <span className="text-xs text-muted">{groupsLabel(t.positions)}</span>
                   <span className="w-12 text-right font-mono">{t.avgPoints.toFixed(1)}</span>
                 </li>
               ))}

@@ -7,6 +7,7 @@ import {
   ScoringStat,
   type LeagueSettings,
 } from "./leagueSettings.ts";
+import type { NrlPosition } from "./positions.ts";
 
 // Site-wide settings, edited by site admins: the scoring new leagues start
 // with, and which league settings commissioners are allowed to change.
@@ -99,5 +100,5 @@ export interface ScoringPreview {
   /** Largest starter level / smallest. 1.00 = perfectly even. */
   spread: number;
   groups: ScoringPreviewGroup[];
-  top: Array<{ rank: number; name: string; club: string | null; positions: string[]; avgPoints: number; games: number }>;
+  top: Array<{ rank: number; name: string; club: string | null; positions: NrlPosition[]; avgPoints: number; games: number }>;
 }

@@ -1,7 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDeferredValue, useState } from "react";
 import { Navigate } from "react-router";
-import { NRL_POSITIONS, POSITION_LABELS, type AdminPlayer, type NrlPosition, type PlayerFilter } from "@nrl/shared";
+import {
+  GROUP_POSITIONS,
+  POSITION_GROUPS,
+  POSITION_GROUP_LABELS,
+  POSITION_GROUP_SHORT,
+  groupsLabel,
+  positionGroups,
+  type AdminPlayer,
+  type NrlPosition,
+  type PlayerFilter,
+  type PositionGroup,
+} from "@nrl/shared";
 import { AppShell } from "../components/Layout.tsx";
 import { Button, Card, ErrorText, Spinner, inputClass } from "../components/ui.tsx";
 import { api } from "../lib/api.ts";
@@ -80,21 +91,22 @@ export function AdminPlayersPage() {
 
 function PlayerRow({ player }: { player: AdminPlayer }) {
   const qc = useQueryClient();
-  const initial = player.positionsOverride.length ? player.positionsOverride : player.derivedPositions;
-  const [selected, setSelected] = useState<NrlPosition[]>(initial);
+  // Admins choose the site's groups; each is stored as all of its NRL positions.
+  // The first group chosen is the player's main one (their colour).
+  const [selected, setSelected] = useState<PositionGroup[]>(positionGroups(player.positions));
   const save = useMutation({
     mutationFn: (positionsOverride: NrlPosition[]) =>
       api<AdminPlayer>(`/api/admin/players/${player.id}`, { method: "PATCH", body: { positionsOverride } }),
     onSuccess: (updated) => {
-      setSelected(updated.positions);
+      setSelected(positionGroups(updated.positions));
       void qc.invalidateQueries({ queryKey: ["admin", "players"] });
     },
   });
 
-  const toggle = (pos: NrlPosition) =>
-    setSelected((cur) => (cur.includes(pos) ? cur.filter((p) => p !== pos) : [...cur, pos]));
-  const changed = selected.join() !== player.positions.join();
-  const sorted = NRL_POSITIONS.filter((p) => selected.includes(p));
+  const toggle = (g: PositionGroup) =>
+    setSelected((cur) => (cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g]));
+  const changed = selected.join() !== positionGroups(player.positions).join();
+  const positions: NrlPosition[] = selected.flatMap((g) => GROUP_POSITIONS[g]);
 
   return (
     <Card className="flex h-full flex-col gap-3">
@@ -117,29 +129,29 @@ function PlayerRow({ player }: { player: AdminPlayer }) {
       </div>
 
       <div className="flex flex-wrap gap-2" role="group" aria-label={`Positions for ${player.name}`}>
-        {NRL_POSITIONS.map((pos) => (
+        {POSITION_GROUPS.map((g) => (
           <button
-            key={pos}
+            key={g}
             type="button"
-            aria-pressed={selected.includes(pos)}
-            title={POSITION_LABELS[pos]}
-            onClick={() => toggle(pos)}
-            className={`min-h-9 min-w-11 rounded-lg px-2 text-sm font-semibold ${
-              selected.includes(pos) ? "bg-accent text-bg" : "bg-surface-2 text-muted hover:text-text"
+            aria-pressed={selected.includes(g)}
+            title={POSITION_GROUP_LABELS[g]}
+            onClick={() => toggle(g)}
+            className={`min-h-9 min-w-16 rounded-lg px-3 text-sm font-semibold ${
+              selected.includes(g) ? "bg-accent text-bg" : "bg-surface-2 text-muted hover:text-text"
             }`}
           >
-            {pos}
+            {POSITION_GROUP_SHORT[g]}
           </button>
         ))}
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button disabled={!changed || sorted.length === 0 || save.isPending} onClick={() => save.mutate(sorted)}>
+        <Button disabled={!changed || positions.length === 0 || save.isPending} onClick={() => save.mutate(positions)}>
           {save.isPending ? "Saving…" : "Save override"}
         </Button>
         {player.positionsOverride.length > 0 && (
           <Button variant="secondary" disabled={save.isPending} onClick={() => save.mutate([])}>
-            Clear override{player.derivedPositions.length ? ` (back to ${player.derivedPositions.join("/")})` : ""}
+            Clear override{player.derivedPositions.length ? ` (back to ${groupsLabel(player.derivedPositions)})` : ""}
           </Button>
         )}
       </div>

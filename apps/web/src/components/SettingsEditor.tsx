@@ -7,6 +7,10 @@ import {
   NRL_LAST_ROUND,
   seasonRounds,
   squadSize,
+  POSITION_GROUPS,
+  POSITION_GROUP_LABELS,
+  positionGroups,
+  type NrlPosition,
   type CommissionerPermissions,
   type LeagueSettings,
   type ScoringStat,
@@ -182,7 +186,7 @@ export function SettingsEditor({
           ) : (
           <div className="flex flex-col gap-3">
             {roster.slots.map((slot, i) => (
-              <Row key={slot.key} label={slot.label} hint={slot.eligible.join(" · ")}>
+              <Row key={slot.key} label={slot.label} hint={slotHint(slot.eligible)}>
                 <Stepper
                   label={slot.label}
                   value={slot.count}
@@ -268,6 +272,12 @@ function SeasonEnd({
       </span>
     </div>
   );
+}
+
+/** Who can fill a slot, in the site's groups ("Any player" for a flex spot). */
+function slotHint(eligible: readonly NrlPosition[]): string {
+  const groups = positionGroups(eligible);
+  return groups.length === POSITION_GROUPS.length ? "Any player" : groups.map((g) => POSITION_GROUP_LABELS[g]).join(", ");
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {

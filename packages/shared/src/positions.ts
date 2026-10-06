@@ -57,3 +57,32 @@ export const POSITION_GROUP_LABELS: Record<PositionGroup, string> = {
 export function positionGroup(positions: readonly NrlPosition[]): PositionGroup | null {
   return positions[0] ? GROUP_OF[positions[0]] : null;
 }
+
+// The site only ever shows these groups (the app's positions), never the NRL
+// positions behind them.
+export const POSITION_GROUPS = ["half", "fwd", "ob"] as const satisfies readonly PositionGroup[];
+
+export const POSITION_GROUP_SHORT: Record<PositionGroup, string> = {
+  half: "HF/HK",
+  fwd: "FWD",
+  ob: "OB",
+};
+
+/** The NRL positions that make up each group. */
+export const GROUP_POSITIONS: Record<PositionGroup, NrlPosition[]> = {
+  half: ["HB", "FE", "HK"],
+  fwd: ["FRF", "2RF", "LK"],
+  ob: ["FB", "WG", "CE"],
+};
+
+/** Every group a player can play, their main one first. */
+export function positionGroups(positions: readonly NrlPosition[]): PositionGroup[] {
+  return [...new Set(positions.map((p) => GROUP_OF[p]))];
+}
+
+/** "HF/HK", or "FWD · OB" for a player in two groups; "" for none. */
+export function groupsLabel(positions: readonly NrlPosition[]): string {
+  return positionGroups(positions)
+    .map((g) => POSITION_GROUP_SHORT[g])
+    .join(" · ");
+}

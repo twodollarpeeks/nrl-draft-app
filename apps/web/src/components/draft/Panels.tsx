@@ -1,4 +1,5 @@
 import {
+  groupsLabel,
   roundOf,
   startersFillable,
   starterCount,
@@ -131,7 +132,7 @@ export function BoardPanel({
                       {p && (
                         <>
                           <div className="truncate font-medium">{p.name}</div>
-                          <div className="text-[10px] font-semibold text-muted">{p.positions.join("/") || "No pos"}</div>
+                          <div className="text-[10px] font-semibold text-muted">{groupsLabel(p.positions) || "No pos"}</div>
                         </>
                       )}
                     </div>
@@ -182,7 +183,7 @@ export function TeamPanel({
       <div className="flex flex-wrap gap-2 text-xs text-muted">
         {template.slots.map((s) => (
           <span key={s.key} className="rounded-full bg-surface-2 px-2 py-1">
-            {s.count}× {s.label} ({s.eligible.join("/")})
+            {s.count}× {s.label}
           </span>
         ))}
       </div>

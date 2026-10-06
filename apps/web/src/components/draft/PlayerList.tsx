@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
 import {
-  NRL_POSITIONS,
+  POSITION_GROUPS,
+  POSITION_GROUP_SHORT,
   checkDraftable,
+  positionGroups,
   type DraftPlayer,
   type NrlPosition,
+  type PositionGroup,
   type RosterTemplate,
 } from "@nrl/shared";
 import { PositionBadge } from "../Position.tsx";
@@ -37,7 +40,7 @@ export function PlayerList({
   onToggleQueue: (id: number) => void;
 }) {
   const [q, setQ] = useState("");
-  const [pos, setPos] = useState<NrlPosition | "ALL">("ALL");
+  const [pos, setPos] = useState<PositionGroup | "ALL">("ALL");
   const [showTaken, setShowTaken] = useState(false);
   const [limit, setLimit] = useState(PAGE);
 
@@ -46,7 +49,7 @@ export function PlayerList({
     return players.filter(
       (p) =>
         (showTaken || !takenBy.has(p.id)) &&
-        (pos === "ALL" || p.positions.includes(pos)) &&
+        (pos === "ALL" || positionGroups(p.positions).includes(pos)) &&
         words.every((w) => p.name.toLowerCase().includes(w) || p.club?.nickName.toLowerCase().includes(w)),
     );
   }, [players, takenBy, q, pos, showTaken]);
@@ -68,7 +71,7 @@ export function PlayerList({
           }}
         />
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0" role="group" aria-label="Filter by position">
-          {(["ALL", ...NRL_POSITIONS] as const).map((p) => (
+          {(["ALL", ...POSITION_GROUPS] as const).map((p) => (
             <button
               key={p}
               aria-pressed={pos === p}
@@ -78,7 +81,7 @@ export function PlayerList({
               }}
               className={`min-h-9 shrink-0 rounded-full px-3 text-sm font-medium ${pos === p ? "bg-accent text-bg" : "bg-surface-2 text-muted"}`}
             >
-              {p === "ALL" ? "All" : p}
+              {p === "ALL" ? "All" : POSITION_GROUP_SHORT[p]}
             </button>
           ))}
       </div>

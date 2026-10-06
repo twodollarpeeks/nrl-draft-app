@@ -1,4 +1,4 @@
-import { POSITION_GROUP_LABELS, positionGroup, type NrlPosition, type PositionGroup } from "@nrl/shared";
+import { POSITION_GROUPS, POSITION_GROUP_LABELS, POSITION_GROUP_SHORT, groupsLabel, positionGroup, type NrlPosition, type PositionGroup } from "@nrl/shared";
 
 // Full class names (not built from parts) so Tailwind sees them.
 export const GROUP_STYLES: Record<PositionGroup | "none", { badge: string; cell: string; dot: string }> = {
@@ -12,11 +12,11 @@ export function groupStyle(positions: readonly NrlPosition[]) {
   return GROUP_STYLES[positionGroup(positions) ?? "none"];
 }
 
-/** "FRF/2RF" in the player's position-group colour. */
+/** "FWD", or "FWD · OB" for a two-group player, in their main group's colour. */
 export function PositionBadge({ positions, className = "" }: { positions: readonly NrlPosition[]; className?: string }) {
   return (
     <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-semibold leading-none ${groupStyle(positions).badge} ${className}`}>
-      {positions.length ? positions.join("/") : "No pos"}
+      {groupsLabel(positions) || "No pos"}
     </span>
   );
 }
@@ -24,10 +24,10 @@ export function PositionBadge({ positions, className = "" }: { positions: readon
 export function PositionLegend() {
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted" aria-label="Position colours">
-      {(Object.keys(POSITION_GROUP_LABELS) as PositionGroup[]).map((g) => (
-        <li key={g} className="flex items-center gap-1.5">
+      {POSITION_GROUPS.map((g) => (
+        <li key={g} className="flex items-center gap-1.5" title={POSITION_GROUP_LABELS[g]}>
           <span className={`size-2.5 rounded-full ${GROUP_STYLES[g].dot}`} aria-hidden />
-          {POSITION_GROUP_LABELS[g]}
+          {POSITION_GROUP_SHORT[g]}
         </li>
       ))}
     </ul>
