@@ -167,7 +167,7 @@ describe.runIf(hasTestDb)("season play", () => {
     it("fills a lineup from the squad in draft order", async () => {
       const res = await teamRound(1, 1, 1);
       expect(res.body.lineup).toEqual({ starters: { HB_HK: [11], FWD: [12], OB: [13] }, bench: [14] });
-      expect(res.body).toMatchObject({ saved: false, editable: true, roundStatus: "upcoming" });
+      expect(res.body).toMatchObject({ lineupSource: "auto", editable: true, roundStatus: "upcoming" });
       expect(res.body.players.find((p) => p.id === 14)).toMatchObject({ note: "bye", status: "dnp" });
     });
 
@@ -176,8 +176,8 @@ describe.runIf(hasTestDb)("season play", () => {
       const swapped = { starters: { HB_HK: [11], FWD: [12], OB: [14] }, bench: [13] };
       const res = await call<TeamRoundView>(users[1]!.id, "PUT", `/api/leagues/${leagueId}/teams/${teamIds[1]}/rounds/1/lineup`, swapped);
       expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({ saved: true, lineup: swapped });
-      expect((await teamRound(1, 1, 5)).body).toMatchObject({ saved: false, lineup: swapped });
+      expect(res.body).toMatchObject({ lineupSource: "saved", lineup: swapped });
+      expect((await teamRound(1, 1, 5)).body).toMatchObject({ lineupSource: "carried", lineup: swapped });
     });
 
     it("rejects bad lineups and other people's teams", async () => {

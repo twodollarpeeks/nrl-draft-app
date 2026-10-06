@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { seasonRounds, squadSize, type LeagueDetail } from "@nrl/shared";
 import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
+import { LeagueNav } from "../components/LeagueNav.tsx";
+import { formatPoints, useRound, useSeason } from "../lib/season.ts";
+import { MatchupCard } from "./MatchupsPage.tsx";
 import { scoringSummary } from "../components/ScoringEditor.tsx";
 import { AppShell } from "../components/Layout.tsx";
 import { Avatar, Button, Card, ErrorText, SectionTitle, Spinner, inputClass } from "../components/ui.tsx";
@@ -15,8 +18,10 @@ export function LeaguePage() {
   if (!league) return <AppShell back="/leagues"><ErrorText error={error} /></AppShell>;
 
   const open = league.teamCount - league.teamsJoined;
+  const inSeason = league.status === "inSeason" || league.status === "complete";
   return (
     <AppShell title={league.name} back="/leagues">
+      {inSeason && <ThisRoundCard league={league} />}
       <DraftCard league={league} />
       {league.status === "setup" && <InviteCard league={league} spotsLeft={open} />}
 
@@ -54,8 +59,56 @@ export function LeaguePage() {
       )}
 
       <SettingsSummary league={league} />
+      {/* Room for the league tab bar. */}
+      {inSeason && <div className="h-16 shrink-0" aria-hidden />}
     </AppShell>
   );
+}
+
+/** In season: this round's matchup (or score) for the viewer's team. */
+function ThisRoundCard({ league }: { league: LeagueDetail }) {
+  const season = useSeason(league.id);
+  const round = useRound(league.id, season.data?.currentRound);
+  if (!season.data || !round.data) {
+    return <Card>{season.error || round.error ? <ErrorText error={season.error ?? round.error} /> : <Spinner />}</Card>;
+  }
+  const s = season.data;
+  const r = round.data;
+  const mine = r.matchups.find((m) => m.home?.teamId === s.myTeamId || m.away?.teamId === s.myTeamId);
+  const myRank = s.ladder.find((row) => row.teamId === s.myTeamId)?.rank;
+  return (
+    <>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-lg font-semibold">
+          {r.title} {r.status === "live" && <span className="text-sm text-accent">● Live</span>}
+        </h2>
+        {myRank && <span className="text-sm text-muted">You're {ordinal(myRank)} on the ladder</span>}
+      </div>
+      {mine ? (
+        <MatchupCard leagueId={league.id} matchup={mine} myTeamId={s.myTeamId} />
+      ) : (
+        <Card className="text-sm text-muted">
+          {s.mode === "totalPoints"
+            ? `You've scored ${formatPoints(r.scores.find((x) => x.teamId === s.myTeamId)?.score)} this round.`
+            : r.round > s.lastRegularRound
+              ? "You're not in a final this round."
+              : "You have the bye this round."}
+        </Card>
+      )}
+      <Link
+        to={`/l/${league.id}/team/${s.myTeamId}/${r.round}`}
+        className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-bg"
+      >
+        {r.status === "complete" ? "See your team" : "Set your lineup"}
+      </Link>
+      <LeagueNav leagueId={league.id} myTeamId={s.myTeamId} />
+    </>
+  );
+}
+
+function ordinal(n: number) {
+  const s = n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+  return `${n}${s}`;
 }
 
 function DraftCard({ league }: { league: LeagueDetail }) {

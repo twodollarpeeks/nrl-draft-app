@@ -255,8 +255,8 @@ export interface TeamRoundView {
   roundStatus: RoundStatus;
   /** The viewer can edit this lineup (their team, round not over). */
   editable: boolean;
-  /** True if this lineup was saved for this round (else carried forward or automatic). */
-  saved: boolean;
+  /** Saved for this round, carried over from an earlier round, or built from the squad. */
+  lineupSource: "saved" | "carried" | "auto";
   lineup: Lineup;
   players: PlayerRoundView[];
   score: { total: number; provisional: boolean; slots: ScoredSlotView[] };

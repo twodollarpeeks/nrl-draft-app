@@ -10,6 +10,9 @@ on:
     - cron: "0 7 * * 2,3"
     # Match days Thu-Mon: hourly from 03:00 to 13:00 UTC (1pm-11pm AEST).
     - cron: "10 3-13 * * 0,1,4,5,6"
+    # Weekly: the whole season's draw, so future rounds have kickoff times
+    # (lineup locks) and byes. Match pages more than a week out aren't fetched.
+    - cron: "0 18 * * 1"
   workflow_dispatch:
     inputs:
       args:
@@ -32,7 +35,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run nrl:import -- $IMPORT_ARGS
+      - name: Import
+        run: |
+          if [ "$SCHEDULE" = "0 18 * * 1" ]; then
+            IMPORT_ARGS="--season $(date -u +%Y) --skip-profiles"
+          fi
+          npm run nrl:import -- $IMPORT_ARGS
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SCHEDULE: ${{ github.event.schedule }}
           IMPORT_ARGS: ${{ github.event.inputs.args || '--current' }}

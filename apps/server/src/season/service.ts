@@ -288,22 +288,23 @@ export class SeasonService {
   }
 
   /** The lineup a team uses in a round: saved for that round, else the latest earlier one, else automatic. */
-  private lineupFor(ctx: SeasonContext, team: TeamInfo, roundNo: number): { lineup: Lineup; saved: boolean } {
+  private lineupFor(
+    ctx: SeasonContext,
+    team: TeamInfo,
+    roundNo: number,
+  ): { lineup: Lineup; source: "saved" | "carried" | "auto" } {
     const saved = ctx.lineups.get(team.id);
-    let base: Lineup | undefined = saved?.get(roundNo);
-    const exact = !!base;
-    if (!base && saved) {
-      const earlier = [...saved.keys()].filter((r) => r < roundNo).sort((a, b) => b - a)[0];
-      if (earlier !== undefined) base = saved.get(earlier);
+    const exact = saved?.get(roundNo);
+    if (exact) return { lineup: reconcileLineup(ctx.settings.roster, team.squad, exact), source: "saved" };
+    const earlier = saved ? [...saved.keys()].filter((r) => r < roundNo).sort((a, b) => b - a)[0] : undefined;
+    if (earlier !== undefined) {
+      return { lineup: reconcileLineup(ctx.settings.roster, team.squad, saved!.get(earlier)!), source: "carried" };
     }
-    const lineup = base
-      ? reconcileLineup(ctx.settings.roster, team.squad, base)
-      : autoLineup(ctx.settings.roster, team.squad);
-    return { lineup, saved: exact };
+    return { lineup: autoLineup(ctx.settings.roster, team.squad), source: "auto" };
   }
 
   private teamScore(ctx: SeasonContext, team: TeamInfo, roundNo: number) {
-    const { lineup, saved } = this.lineupFor(ctx, team, roundNo);
+    const { lineup, source } = this.lineupFor(ctx, team, roundNo);
     const results = new Map<number, PlayerRoundResult>();
     const views: PlayerRoundView[] = [];
     for (const p of team.squad) {
@@ -314,7 +315,7 @@ export class SeasonService {
     const score = scoreTeamRound(ctx.settings.roster, lineup, results);
     // Until the draw is loaded nothing is final.
     const provisional = score.provisional || ctx.rounds.get(roundNo)?.status !== "complete";
-    return { lineup, saved, views, score: { ...score, provisional } };
+    return { lineup, source, views, score: { ...score, provisional } };
   }
 
   // ---- Views -------------------------------------------------------------------
@@ -324,7 +325,7 @@ export class SeasonService {
     this.checkRound(ctx, roundNo);
     const team = ctx.teams.find((t) => t.id === teamId);
     if (!team) throw notFound("Team");
-    const { lineup, saved, views, score } = this.teamScore(ctx, team, roundNo);
+    const { lineup, source, views, score } = this.teamScore(ctx, team, roundNo);
     const round = ctx.rounds.get(roundNo);
     return {
       leagueId,
@@ -335,7 +336,7 @@ export class SeasonService {
       roundTitle: round?.title ?? `Round ${roundNo}`,
       roundStatus: round?.status ?? "upcoming",
       editable: team.ownerId === user.id && round?.status !== "complete",
-      saved,
+      lineupSource: source,
       lineup,
       players: views,
       score: { total: score.total, provisional: score.provisional, slots: score.slots },

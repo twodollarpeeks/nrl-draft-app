@@ -122,3 +122,52 @@ export function autoLineup(template: RosterTemplate, squadBestFirst: readonly Sq
   }
   return { starters, bench: squadBestFirst.filter((p) => !used.has(p.id)).map((p) => p.id) };
 }
+
+function readSpot(lineup: Lineup, spot: Spot): number | null {
+  const [key, idx] = spot.split(":") as [string, string];
+  const i = Number(idx);
+  return key === "bench" ? (lineup.bench[i] ?? null) : (lineup.starters[key]?.[i] ?? null);
+}
+
+/**
+ * Swap whatever is in two spots ("FWD:1", "bench:0", or an empty starting
+ * spot). Moving a bench player into an empty starting spot takes them off
+ * the bench; the bench never has gaps. Returns a new lineup (validate it with
+ * lineupErrors / movedLockedPlayers).
+ */
+export function swapSpots(lineup: Lineup, a: Spot, b: Spot): Lineup {
+  if (a === b) return lineup;
+  const starters = Object.fromEntries(Object.entries(lineup.starters).map(([k, v]) => [k, [...v]]));
+  const bench: Array<number | null> = [...lineup.bench];
+  const write = (spot: Spot, id: number | null) => {
+    const [key, idx] = spot.split(":") as [string, string];
+    if (key === "bench") bench[Number(idx)] = id;
+    else starters[key]![Number(idx)] = id;
+  };
+  const va = readSpot(lineup, a);
+  const vb = readSpot(lineup, b);
+  write(a, vb);
+  write(b, va);
+  return { starters, bench: bench.filter((id): id is number => id !== null) };
+}
+
+/** Take a starter out of their spot and put them at the end of the bench. */
+export function moveToBench(lineup: Lineup, spot: Spot): Lineup {
+  const id = readSpot(lineup, spot);
+  if (id === null || spot.startsWith("bench:")) return lineup;
+  const next = swapSpots(lineup, spot, `bench:${lineup.bench.length}`);
+  return { ...next, bench: [...next.bench.filter((x) => x !== id), id] };
+}
+
+/** Would this swap leave every moved player in a spot they can play? */
+export function canSwap(template: RosterTemplate, squad: readonly SquadPlayer[], lineup: Lineup, a: Spot, b: Spot): boolean {
+  const positions = new Map(squad.map((p) => [p.id, p.positions]));
+  const fits = (id: number | null, spot: Spot) => {
+    if (id === null) return true;
+    const key = spot.split(":")[0]!;
+    if (key === "bench") return true;
+    const slot = template.slots.find((s) => s.key === key);
+    return !!slot && (positions.get(id) ?? []).some((p) => slot.eligible.includes(p));
+  };
+  return fits(readSpot(lineup, a), b) && fits(readSpot(lineup, b), a);
+}

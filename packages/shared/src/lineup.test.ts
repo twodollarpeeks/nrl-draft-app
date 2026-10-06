@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ROSTER_TEMPLATE as T } from "./leagueSettings.ts";
-import { autoLineup, lineupErrors, movedLockedPlayers, reconcileLineup, type Lineup, type SquadPlayer } from "./lineup.ts";
+import {
+  autoLineup,
+  canSwap,
+  lineupErrors,
+  moveToBench,
+  movedLockedPlayers,
+  reconcileLineup,
+  swapSpots,
+  type Lineup,
+  type SquadPlayer,
+} from "./lineup.ts";
 
 // 14-man squad, best first: ids encode position.
 const squad: SquadPlayer[] = [
@@ -88,5 +98,37 @@ describe("reconcileLineup", () => {
     expect(r.starters.OB).toEqual([null, 5, 7]);
     expect(r.bench).toEqual([10, 11, 12, 13, 14, 20]);
     expect(lineupErrors(T, newSquad, r)).toEqual([]);
+  });
+});
+
+describe("swapSpots / moveToBench / canSwap", () => {
+  const base = autoLineup(T, squad); // FLEX: [8], bench [9..14]
+
+  it("swaps a starter with a bench player", () => {
+    const l = swapSpots(base, "FLEX:0", "bench:0");
+    expect(l.starters.FLEX).toEqual([9]);
+    expect(l.bench).toEqual([8, 10, 11, 12, 13, 14]);
+    expect(lineupErrors(T, squad, l)).toEqual([]);
+  });
+
+  it("reorders the bench (emergency order)", () => {
+    expect(swapSpots(base, "bench:0", "bench:2").bench).toEqual([11, 10, 9, 12, 13, 14]);
+  });
+
+  it("fills an empty starting spot from the bench without leaving a gap", () => {
+    const emptied = moveToBench(base, "FLEX:0");
+    expect(emptied.starters.FLEX).toEqual([null]);
+    expect(emptied.bench).toEqual([9, 10, 11, 12, 13, 14, 8]);
+    const filled = swapSpots(emptied, "bench:1", "FLEX:0");
+    expect(filled.starters.FLEX).toEqual([10]);
+    expect(filled.bench).toEqual([9, 11, 12, 13, 14, 8]);
+    expect(lineupErrors(T, squad, filled)).toEqual([]);
+  });
+
+  it("checks both players can play their new spots", () => {
+    expect(canSwap(T, squad, base, "FWD:0", "bench:0")).toBe(false); // winger 9 can't play FWD
+    expect(canSwap(T, squad, base, "FWD:0", "bench:1")).toBe(true); // 2RF 10 can
+    expect(canSwap(T, squad, base, "HB_HK:0", "bench:5")).toBe(true); // hooker 14 for HB 3
+    expect(canSwap(T, squad, base, "bench:0", "bench:3")).toBe(true);
   });
 });

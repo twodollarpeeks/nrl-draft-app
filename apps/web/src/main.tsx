@@ -9,6 +9,9 @@ import { AdminPlayersPage } from "./pages/AdminPlayersPage.tsx";
 import { AdminScoringPage } from "./pages/AdminScoringPage.tsx";
 import { CreateLeaguePage } from "./pages/CreateLeaguePage.tsx";
 import { DraftRoomPage } from "./pages/DraftRoomPage.tsx";
+import { LadderPage } from "./pages/LadderPage.tsx";
+import { MatchupsPage } from "./pages/MatchupsPage.tsx";
+import { TeamRoundPage } from "./pages/TeamRoundPage.tsx";
 import { JoinPage } from "./pages/JoinPage.tsx";
 import { LeaguePage } from "./pages/LeaguePage.tsx";
 import { LeagueSettingsPage } from "./pages/LeagueSettingsPage.tsx";
@@ -38,6 +41,9 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/join/:code" element={authed(<JoinPage />)} />
           <Route path="/l/:id" element={authed(<LeaguePage />)} />
           <Route path="/l/:id/draft" element={authed(<DraftRoomPage />)} />
+          <Route path="/l/:id/team/:teamId/:round?" element={authed(<TeamRoundPage />)} />
+          <Route path="/l/:id/matchups/:round?" element={authed(<MatchupsPage />)} />
+          <Route path="/l/:id/ladder" element={authed(<LadderPage />)} />
           <Route path="/l/:id/settings" element={authed(<LeagueSettingsPage />)} />
           <Route path="/profile" element={authed(<ProfilePage />)} />
           <Route path="/admin/players" element={authed(<AdminPlayersPage />)} />
