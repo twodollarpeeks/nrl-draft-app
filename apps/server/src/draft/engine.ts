@@ -14,6 +14,7 @@ import {
 } from "@nrl/shared";
 import type { SessionUser } from "../auth.ts";
 import { AppError, conflict, forbidden, notFound } from "../errors.ts";
+import { startSeason, unstartSeason } from "../season/setup.ts";
 import { loadDraftPlayers } from "./rankings.ts";
 import { DraftTimers } from "./timers.ts";
 
@@ -269,7 +270,10 @@ export class DraftEngine {
       await tx.rosterEntry.deleteMany({
         where: { leagueId, teamId: last.teamId, playerId: last.playerId, acquiredVia: "draft" },
       });
-      if (draft.status === "complete") await tx.league.update({ where: { id: leagueId }, data: { status: "drafting" } });
+      if (draft.status === "complete") {
+        await tx.league.update({ where: { id: leagueId }, data: { status: "drafting" } });
+        await unstartSeason(tx, leagueId);
+      }
       await tx.auditLog.create({
         data: { leagueId, actorId: user.id, action: "draft.undo", payload: { pickNo: last.pickNo, playerId: last.playerId } },
       });
@@ -420,6 +424,7 @@ export class DraftEngine {
     const next = draft.currentPick + 1;
     if (next > draft.totalPicks) {
       await tx.league.update({ where: { id: draft.leagueId }, data: { status: "inSeason" } });
+      await startSeason(tx, draft.leagueId, draft.order, this.now());
       await tx.auditLog.create({ data: { leagueId: draft.leagueId, action: "draft.complete" } });
       return tx.draft.update({
         where: { id: draft.id },

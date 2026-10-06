@@ -34,8 +34,8 @@ export interface FinalsBracket<T> {
   champion: T | null;
 }
 
-/** [homePoints, awayPoints] once a game between these two is final, else null. */
-export type FinalsScore<T> = (home: T, away: T) => readonly [number, number] | null;
+/** [homePoints, awayPoints] once the game in this week of the finals is over, else null. */
+export type FinalsScore<T> = (home: T, away: T, week: number) => readonly [number, number] | null;
 
 export function finalsBracket<T>(size: FinalsSize, seeds: readonly T[], score: FinalsScore<T>): FinalsBracket<T> {
   if (seeds.length !== size) throw new Error(`Need ${size} finals teams, got ${seeds.length}`);
@@ -49,7 +49,7 @@ export function finalsBracket<T>(size: FinalsSize, seeds: readonly T[], score: F
     let winner: T | null = null;
     let loser: T | null = null;
     if (home !== null && away !== null) {
-      const s = score(home, away);
+      const s = score(home, away, week);
       if (s) [winner, loser] = s[1] > s[0] ? [away, home] : [home, away];
     }
     const g = { id, week, label, home, away, winner, loser };

@@ -239,6 +239,9 @@ model League {
   // Team ids in round-1 order; empty until set or drawn.
   draftOrder        String[]
   draftOrderLocked  Boolean   @default(false)
+  // First fantasy round: the first NRL round not yet started when the draft
+  // finished (1 for a replay of a finished season). Set at draft completion.
+  firstRound        Int?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -247,6 +250,8 @@ model League {
   auditLog     AuditLog[]
   draft        Draft?
   roster       RosterEntry[]
+  lineups      Lineup[]
+  matchups     Matchup[]
 }
 
 // A user's team in a league. Also the league membership: one team per user
@@ -263,6 +268,9 @@ model Team {
   draftPicks DraftPick[]
   queue      DraftQueueItem[]
   roster     RosterEntry[]
+  lineups    Lineup[]
+  homeGames  Matchup[]        @relation("HomeTeam")
+  awayGames  Matchup[]        @relation("AwayTeam")
 
   @@unique([leagueId, ownerId])
   @@unique([leagueId, name])
@@ -385,4 +393,46 @@ model SiteSetting {
   value     Json
   updatedAt DateTime @updatedAt
   updatedBy String? // admin's email
+}
+
+// ---------------------------------------------------------------------------
+// Season play
+// ---------------------------------------------------------------------------
+
+// A team's lineup for one round, saved when the manager edits it. Rounds with
+// no saved lineup use the latest earlier one (or one built from the squad).
+model Lineup {
+  id        String   @id @default(cuid())
+  leagueId  String
+  teamId    String
+  round     Int
+  // { slotKey: [playerId | null, ...] }
+  starters  Json
+  // Everyone else, in emergency order.
+  bench     Int[]
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, round])
+  @@index([leagueId, round])
+}
+
+// Regular-season head-to-head fixture, generated when the draft finishes.
+// Finals pairings come from the ladder, so they aren't stored.
+model Matchup {
+  id         String @id @default(cuid())
+  leagueId   String
+  round      Int
+  homeTeamId String
+  awayTeamId String
+
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  homeTeam Team   @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
+  awayTeam Team   @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, round, homeTeamId])
+  @@index([leagueId, round])
 }

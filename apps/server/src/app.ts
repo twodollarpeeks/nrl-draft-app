@@ -12,6 +12,8 @@ import { registerErrorHandler } from "./errors.ts";
 import { createGuards, parseAdminEmails } from "./guards.ts";
 import { registerLeagueRoutes } from "./leagues/routes.ts";
 import type { LeagueServiceOptions } from "./leagues/service.ts";
+import { registerSeasonRoutes } from "./season/routes.ts";
+import { SeasonService } from "./season/service.ts";
 
 export interface AppDeps {
   env: Env;
@@ -23,11 +25,13 @@ export interface AppDeps {
   draft?: Omit<DraftEngineOptions, "onChange" | "log">;
   /** League service options (tests inject a clock and shuffle). */
   leagues?: Omit<LeagueServiceOptions, "onDraftAtChange">;
+  /** Season options (tests inject a clock). */
+  season?: { now?: () => Date };
   /** Serve the draft room's sockets and run its clock (the real server). */
   realtime?: boolean;
 }
 
-export async function buildApp({ env, db, auth, getUser, draft, leagues, realtime = false }: AppDeps) {
+export async function buildApp({ env, db, auth, getUser, draft, leagues, season, realtime = false }: AppDeps) {
   const app = Fastify({
     logger: env.NODE_ENV === "test" ? false : { level: "info" },
   });
@@ -53,6 +57,7 @@ export async function buildApp({ env, db, auth, getUser, draft, leagues, realtim
     });
     registerAdminRoutes(app, db, guards);
     registerDraftRoutes(app, engine, guards);
+    registerSeasonRoutes(app, new SeasonService(db, season ?? {}), guards);
     app.decorate("draftEngine", engine);
 
     if (realtime) {
