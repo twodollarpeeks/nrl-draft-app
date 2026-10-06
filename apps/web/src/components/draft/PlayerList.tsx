@@ -54,36 +54,39 @@ export function PlayerList({
 
   return (
     <div className="flex flex-col gap-3">
-      <input
-        type="search"
-        className={inputClass}
-        placeholder="Search players or clubs"
-        aria-label="Search players"
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setLimit(PAGE);
-        }}
-      />
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Filter by position">
-        {(["ALL", ...NRL_POSITIONS] as const).map((p) => (
-          <button
-            key={p}
-            aria-pressed={pos === p}
-            onClick={() => {
-              setPos(p);
-              setLimit(PAGE);
-            }}
-            className={`min-h-9 shrink-0 rounded-full px-3 text-sm font-medium ${pos === p ? "bg-accent text-bg" : "bg-surface-2 text-muted"}`}
-          >
-            {p === "ALL" ? "All" : p}
-          </button>
-        ))}
+      {/* Desktop: the list scrolls in its own column, so the filters stay put. */}
+      <div className="flex flex-col gap-3 lg:sticky lg:top-0 lg:z-10 lg:bg-bg lg:pb-1">
+        <input
+          type="search"
+          className={inputClass}
+          placeholder="Search players or clubs"
+          aria-label="Search players"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setLimit(PAGE);
+          }}
+        />
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0" role="group" aria-label="Filter by position">
+          {(["ALL", ...NRL_POSITIONS] as const).map((p) => (
+            <button
+              key={p}
+              aria-pressed={pos === p}
+              onClick={() => {
+                setPos(p);
+                setLimit(PAGE);
+              }}
+              className={`min-h-9 shrink-0 rounded-full px-3 text-sm font-medium ${pos === p ? "bg-accent text-bg" : "bg-surface-2 text-muted"}`}
+            >
+              {p === "ALL" ? "All" : p}
+            </button>
+          ))}
       </div>
       <label className="flex items-center gap-2 text-sm text-muted">
         <input type="checkbox" checked={showTaken} onChange={(e) => setShowTaken(e.target.checked)} className="accent-(--color-accent)" />
         Show drafted players
       </label>
+      </div>
 
       <ul className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-surface">
         {filtered.slice(0, limit).map((p) => {

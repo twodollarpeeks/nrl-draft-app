@@ -30,7 +30,7 @@ export function QueuePanel({
   if (queue.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted">
-        Tap ☆ on players to queue them. If your time runs out, autopick takes the first one still available, then the
+        Star (☆) players to queue them. If your time runs out, autopick takes the first one still available, then the
         best available player.
       </p>
     );
@@ -68,31 +68,36 @@ export function BoardPanel({
   state,
   players,
   myTeamId,
+  fill = false,
 }: {
   state: DraftState;
   players: Map<number, DraftPlayer>;
   myTeamId: string;
+  /** Fill the space it's given and scroll inside it, with team names pinned (desktop). */
+  fill?: boolean;
 }) {
   if (state.order.length === 0 || state.rounds === 0) {
     return <p className="text-sm text-muted">The board appears once the draft starts and the order is drawn.</p>;
   }
   const byPick = new Map(state.picks.map((p) => [p.pickNo, p]));
   const n = state.order.length;
+  // Team names stay in view while the board scrolls; the shadow covers the cell gap above them.
+  const pinned = fill ? "sticky top-0 z-10 shadow-[0_-4px_0_var(--color-bg)]" : "";
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col gap-2 ${fill ? "min-h-0 flex-1" : ""}`}>
     <PositionLegend />
-    <div className="-mx-4 overflow-x-auto px-4">
-      <table className="border-separate border-spacing-1 text-xs">
+    <div className={fill ? "min-h-0 flex-1 overflow-auto rounded-xl border border-border" : "-mx-4 overflow-x-auto px-4"}>
+      <table className={`border-separate border-spacing-1 text-xs ${fill ? "min-w-full" : ""}`}>
         <thead>
           <tr>
-            <th className="sticky left-0 bg-bg" />
+            <th className={`sticky left-0 bg-bg ${pinned} z-20`} />
             {state.order.map((t) => (
               <th
                 key={t.id}
                 scope="col"
-                className={`w-28 min-w-28 truncate rounded-lg px-2 py-1.5 text-left font-semibold ${t.id === myTeamId ? "bg-accent/15 text-accent" : "bg-surface-2"}`}
+                className={`rounded-lg px-2 py-1.5 text-left font-semibold ${pinned} ${t.id === myTeamId ? "bg-mine text-accent" : "bg-surface-2"}`}
               >
-                {t.name}
+                <div className="w-24 truncate">{t.name}</div>
               </th>
             ))}
           </tr>
@@ -113,20 +118,23 @@ export function BoardPanel({
                 return (
                   <td
                     key={t.id}
-                    className={`h-12 w-28 min-w-28 rounded-lg border-l-4 px-2 align-top ${
+                    className={`h-12 rounded-lg border-l-4 px-2 align-top ${
                       current ? "ring-2 ring-accent" : ""
                     } ${p ? groupStyle(p.positions).cell : "border-l-transparent bg-surface/40"}`}
                   >
-                    <div className="font-mono text-[10px] text-muted">
-                      {roundOf(n, pickNo)}.{inRound + 1}
-                      {pick?.madeBy === "autopick" && " · auto"}
+                    {/* Fixed width, so long names truncate instead of widening the column. */}
+                    <div className="w-24">
+                      <div className="font-mono text-[10px] text-muted">
+                        {roundOf(n, pickNo)}.{inRound + 1}
+                        {pick?.madeBy === "autopick" && " · auto"}
+                      </div>
+                      {p && (
+                        <>
+                          <div className="truncate font-medium">{p.name}</div>
+                          <div className="text-[10px] font-semibold text-muted">{p.positions.join("/") || "No pos"}</div>
+                        </>
+                      )}
                     </div>
-                    {p && (
-                      <>
-                        <div className="truncate font-medium">{p.name}</div>
-                        <div className="text-[10px] font-semibold text-muted">{p.positions.join("/") || "No pos"}</div>
-                      </>
-                    )}
                   </td>
                 );
               })}

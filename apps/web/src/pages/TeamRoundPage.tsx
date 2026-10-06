@@ -15,7 +15,7 @@ import {
 } from "@nrl/shared";
 import { AppShell } from "../components/Layout.tsx";
 import { PositionBadge } from "../components/Position.tsx";
-import { LeagueNav, RoundPicker } from "../components/LeagueNav.tsx";
+import { RoundPicker } from "../components/LeagueNav.tsx";
 import { Button, Card, ErrorText, SectionTitle, Spinner } from "../components/ui.tsx";
 import { useLeague } from "../lib/queries.ts";
 import { formatKickoff, formatPoints, useSaveLineup, useSeason, useTeamRound } from "../lib/season.ts";
@@ -105,41 +105,68 @@ function TeamRound({ league, season, view }: { league: LeagueDetail; season: Sea
   const errors = dirty ? lineupErrors(template, squad, lineup) : [];
   const selectedId = selected ? spotOccupant(lineup, selected) : null;
 
+  const saveError = save.error ?? (errors.length ? errors.join(". ") : null);
+  const saveButtons = (
+    <div className="flex gap-2">
+      <Button
+        className="flex-1 shadow-lg lg:shadow-none"
+        disabled={save.isPending || errors.length > 0}
+        onClick={() => save.mutate(lineup, { onSuccess: () => setDraft(null) })}
+      >
+        {save.isPending ? "Saving…" : "Save lineup"}
+      </Button>
+      <Button variant="secondary" className="shadow-lg lg:shadow-none" onClick={() => setDraft(null)}>
+        Undo
+      </Button>
+    </div>
+  );
+
   return (
-    <AppShell title={view.teamName} back={`/l/${league.id}`}>
-      <div className="flex flex-col gap-4 pb-24">
-        <RoundPicker
-          round={view.round}
-          first={season.firstRound}
-          last={season.grandFinalRound ?? season.lastRegularRound}
-          title={view.roundTitle}
-          status={view.roundStatus}
-          onChange={(r) => navigate(`/l/${league.id}/team/${view.teamId}/${r}`)}
-        />
+    <AppShell title={view.teamName} back={`/l/${league.id}`} width="wide" league={{ id: league.id, myTeamId: season.myTeamId }}>
+      {/* Desktop: round, score and save on the left; starters and bench side by side. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-6">
+        <div className="flex flex-col gap-4 lg:sticky lg:top-20">
+          <RoundPicker
+            round={view.round}
+            first={season.firstRound}
+            last={season.grandFinalRound ?? season.lastRegularRound}
+            title={view.roundTitle}
+            status={view.roundStatus}
+            onChange={(r) => navigate(`/l/${league.id}/team/${view.teamId}/${r}`)}
+          />
 
-        <Card className="flex items-center justify-between">
-          <div>
-            <div className="text-sm text-muted">{isMine ? "Your score" : `${view.ownerName}'s score`}</div>
-            <div className="text-xs text-muted">
-              {view.score.provisional ? (view.roundStatus === "upcoming" ? "Not started" : "Live, may change") : "Final"}
-              {view.editable && view.lineupSource === "carried" ? " · lineup carried over from last round" : ""}
-              {view.editable && view.lineupSource === "auto" ? " · lineup picked for you: change it below" : ""}
+          <Card className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-muted">{isMine ? "Your score" : `${view.ownerName}'s score`}</div>
+              <div className="text-xs text-muted">
+                {view.score.provisional ? (view.roundStatus === "upcoming" ? "Not started" : "Live, may change") : "Final"}
+                {view.editable && view.lineupSource === "carried" ? " · lineup carried over from last round" : ""}
+                {view.editable && view.lineupSource === "auto" ? " · lineup picked for you: change it below" : ""}
+              </div>
             </div>
-          </div>
-          <div className="font-mono text-4xl font-bold tabular-nums">{formatPoints(view.score.total)}</div>
-        </Card>
+            <div className="font-mono text-4xl font-bold tabular-nums">{formatPoints(view.score.total)}</div>
+          </Card>
 
-        {view.editable && (
-          <p className="text-xs text-muted">
-            Tap a player, then tap where they should go. Players lock when their game kicks off.
-            {roundInfo?.firstKickoff ? ` First game: ${formatKickoff(roundInfo.firstKickoff)}.` : ""}
-          </p>
-        )}
-        {hint && (
-          <p role="status" className="rounded-xl bg-surface-2 px-3 py-2 text-sm">
-            {hint}
-          </p>
-        )}
+          {view.editable && (
+            <p className="text-xs text-muted">
+              <span className="lg:hidden">Tap a player, then tap where they should go.</span>
+              <span className="hidden lg:inline">Click a player, then click where they should go.</span> Players lock
+              when their game kicks off.
+              {roundInfo?.firstKickoff ? ` First game: ${formatKickoff(roundInfo.firstKickoff)}.` : ""}
+            </p>
+          )}
+          {hint && (
+            <p role="status" className="rounded-xl bg-surface-2 px-3 py-2 text-sm">
+              {hint}
+            </p>
+          )}
+          {dirty && (
+            <div className="hidden flex-col gap-2 lg:flex">
+              <ErrorText error={saveError} />
+              {saveButtons}
+            </div>
+          )}
+        </div>
 
         <section>
           <SectionTitle>Starting side</SectionTitle>
@@ -173,7 +200,7 @@ function TeamRound({ league, season, view }: { league: LeagueDetail; season: Sea
           )}
         </section>
 
-        <section>
+        <section className="pb-20 lg:pb-0">
           <SectionTitle>Bench · emergencies in order</SectionTitle>
           <p className="mb-2 text-xs text-muted">
             If a starter doesn't play, the first emergency below who can play that position and does play comes in.
@@ -198,24 +225,13 @@ function TeamRound({ league, season, view }: { league: LeagueDetail; season: Sea
         </section>
       </div>
 
+      {/* Phones: save floats above the tab bar. */}
       {dirty && (
-        <div className="fixed inset-x-0 bottom-16 z-30 mx-auto flex max-w-2xl flex-col gap-2 px-4">
-          <ErrorText error={save.error ?? (errors.length ? errors.join(". ") : null)} />
-          <div className="flex gap-2">
-            <Button
-              className="flex-1 shadow-lg"
-              disabled={save.isPending || errors.length > 0}
-              onClick={() => save.mutate(lineup, { onSuccess: () => setDraft(null) })}
-            >
-              {save.isPending ? "Saving…" : "Save lineup"}
-            </Button>
-            <Button variant="secondary" className="shadow-lg" onClick={() => setDraft(null)}>
-              Undo
-            </Button>
-          </div>
+        <div className="fixed inset-x-0 bottom-16 z-30 mx-auto flex max-w-2xl flex-col gap-2 px-4 lg:hidden">
+          <ErrorText error={saveError} />
+          {saveButtons}
         </div>
       )}
-      <LeagueNav leagueId={league.id} myTeamId={season.myTeamId} />
     </AppShell>
   );
 }
@@ -260,7 +276,7 @@ function PlayerRow({
       aria-pressed={selected}
       className={`flex w-full items-center gap-3 rounded-xl border bg-surface px-3 py-2.5 text-left ${border}`}
     >
-      <span className="w-12 shrink-0 text-xs font-semibold text-muted">{label}</span>
+      <span className="w-12 shrink-0 text-xs font-semibold text-muted lg:w-16">{label}</span>
       {player ? (
         <span className="min-w-0 flex-1">
           <span className={`flex items-center gap-2 ${dim ? "" : "font-medium"}`}>

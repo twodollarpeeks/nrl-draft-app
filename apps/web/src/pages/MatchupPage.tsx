@@ -10,10 +10,10 @@ import {
   type TeamRoundView,
 } from "@nrl/shared";
 import { AppShell } from "../components/Layout.tsx";
-import { LeagueNav } from "../components/LeagueNav.tsx";
-import { Card, ErrorText, Spinner } from "../components/ui.tsx";
+import { Card, ErrorText, SectionTitle, Spinner } from "../components/ui.tsx";
 import { useLeague } from "../lib/queries.ts";
-import { formatKickoff, formatPoints, useTeamRound } from "../lib/season.ts";
+import { formatKickoff, formatPoints, useRound, useTeamRound } from "../lib/season.ts";
+import { MatchupCard } from "./MatchupsPage.tsx";
 
 /** Head-to-head: both lineups side by side, slot by slot, with live scores. */
 export function MatchupPage() {
@@ -95,7 +95,7 @@ function Matchup({ league, myTeamId, home, away }: { league: LeagueDetail; myTea
       </div>
       <div className="truncate text-xs text-muted">{team.ownerName}</div>
       <div
-        className={`font-mono text-3xl font-bold tabular-nums ${
+        className={`font-mono text-3xl font-bold tabular-nums lg:text-5xl ${
           winner && winner !== team.teamId ? "text-muted" : SCORE_COLOUR[totalState(team, players)]
         }`}
       >
@@ -108,63 +108,92 @@ function Matchup({ league, myTeamId, home, away }: { league: LeagueDetail; myTea
     open !== null && ids.includes(open) ? <Breakdown player={(homePlayers.get(open) ?? awayPlayers.get(open))!} /> : null;
 
   return (
-    <AppShell title={home.roundTitle} back={`/l/${league.id}/matchups/${home.round}`}>
-      <div className="flex flex-col gap-3 pb-20">
-        <Card className="flex items-start gap-3">
-          {side(home, homePlayers, "left")}
-          <div className={`shrink-0 pt-1 text-xs ${home.roundStatus === "live" ? "text-accent" : "text-muted"}`}>{status}</div>
-          {side(away, awayPlayers, "right")}
-        </Card>
+    <AppShell title={home.roundTitle} back={`/l/${league.id}/matchups/${home.round}`} width="wide" league={{ id: league.id, myTeamId }}>
+      {/* Desktop: the round's other matchups alongside. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+        <div className="flex flex-col gap-3">
+          <Card className="flex items-start gap-3">
+            {side(home, homePlayers, "left")}
+            <div className={`shrink-0 pt-1 text-xs ${home.roundStatus === "live" ? "text-accent" : "text-muted"}`}>{status}</div>
+            {side(away, awayPlayers, "right")}
+          </Card>
 
-        <ul className="flex flex-col gap-1.5">
-          {rows.map((r) => {
-            const hp = r.h?.starterId != null ? homePlayers.get(r.h.starterId) : undefined;
-            const ap = r.a?.starterId != null ? awayPlayers.get(r.a.starterId) : undefined;
-            return (
-              <li key={r.key}>
-                <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-1.5">
-                  <PlayerCell player={hp} align="left" greyed={hp?.status === "dnp"} onTap={toggle} />
-                  <SlotLabel>{r.label}</SlotLabel>
-                  <PlayerCell player={ap} align="right" greyed={ap?.status === "dnp"} onTap={toggle} />
-                </div>
-                {breakdownFor(hp?.id, ap?.id)}
-              </li>
-            );
-          })}
-        </ul>
+          <ul className="flex flex-col gap-1.5">
+            {rows.map((r) => {
+              const hp = r.h?.starterId != null ? homePlayers.get(r.h.starterId) : undefined;
+              const ap = r.a?.starterId != null ? awayPlayers.get(r.a.starterId) : undefined;
+              return (
+                <li key={r.key}>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-1.5">
+                    <PlayerCell player={hp} align="left" greyed={hp?.status === "dnp"} onTap={toggle} />
+                    <SlotLabel>{r.label}</SlotLabel>
+                    <PlayerCell player={ap} align="right" greyed={ap?.status === "dnp"} onTap={toggle} />
+                  </div>
+                  {breakdownFor(hp?.id, ap?.id)}
+                </li>
+              );
+            })}
+          </ul>
 
-        <div className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted">Bench · emergencies in order</div>
-        <ul className="flex flex-col gap-1.5">
-          {Array.from({ length: benchRows }, (_, i) => {
-            const hp = homePlayers.get(home.lineup.bench[i] ?? -1);
-            const ap = awayPlayers.get(away.lineup.bench[i] ?? -1);
-            return (
-              <li key={i}>
-                <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-1.5">
-                  <PlayerCell player={hp} align="left" greyed={!!hp && !homeIn.has(hp.id)} inFor={hp ? homeIn.get(hp.id) : undefined} onTap={toggle} />
-                  <SlotLabel>E{i + 1}</SlotLabel>
-                  <PlayerCell player={ap} align="right" greyed={!!ap && !awayIn.has(ap.id)} inFor={ap ? awayIn.get(ap.id) : undefined} onTap={toggle} />
-                </div>
-                {breakdownFor(hp?.id, ap?.id)}
-              </li>
-            );
-          })}
-        </ul>
+          <div className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted">Bench · emergencies in order</div>
+          <ul className="flex flex-col gap-1.5">
+            {Array.from({ length: benchRows }, (_, i) => {
+              const hp = homePlayers.get(home.lineup.bench[i] ?? -1);
+              const ap = awayPlayers.get(away.lineup.bench[i] ?? -1);
+              return (
+                <li key={i}>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-1.5">
+                    <PlayerCell player={hp} align="left" greyed={!!hp && !homeIn.has(hp.id)} inFor={hp ? homeIn.get(hp.id) : undefined} onTap={toggle} />
+                    <SlotLabel>E{i + 1}</SlotLabel>
+                    <PlayerCell player={ap} align="right" greyed={!!ap && !awayIn.has(ap.id)} inFor={ap ? awayIn.get(ap.id) : undefined} onTap={toggle} />
+                  </div>
+                  {breakdownFor(hp?.id, ap?.id)}
+                </li>
+              );
+            })}
+          </ul>
 
-        <p className="flex flex-wrap justify-center gap-x-4 text-xs text-muted">
-          <span>
-            <span className="text-accent">●</span> Final
-          </span>
-          <span>
-            <span className="text-text">●</span> Live
-          </span>
-          <span>
-            <span className="text-review">●</span> In review (stats checked for 24h after full time)
-          </span>
-        </p>
+          <p className="flex flex-wrap justify-center gap-x-4 text-xs text-muted">
+            <span>
+              <span className="text-accent">●</span> Final
+            </span>
+            <span>
+              <span className="text-text">●</span> Live
+            </span>
+            <span>
+              <span className="text-review">●</span> In review (stats checked for 24h after full time)
+            </span>
+          </p>
+        </div>
+        <OtherMatchups leagueId={league.id} round={home.round} myTeamId={myTeamId} current={[home.teamId, away.teamId]} />
       </div>
-      <LeagueNav leagueId={league.id} myTeamId={myTeamId} />
     </AppShell>
+  );
+}
+
+function OtherMatchups({
+  leagueId,
+  round,
+  myTeamId,
+  current,
+}: {
+  leagueId: string;
+  round: number;
+  myTeamId: string;
+  current: [string, string];
+}) {
+  const view = useRound(leagueId, round);
+  const others = (view.data?.matchups ?? []).filter(
+    (m) => !(m.home?.teamId === current[0] && m.away?.teamId === current[1]),
+  );
+  if (others.length === 0) return null;
+  return (
+    <aside className="hidden flex-col gap-3 lg:sticky lg:top-20 lg:flex">
+      <SectionTitle>Also this round</SectionTitle>
+      {others.map((m) => (
+        <MatchupCard key={`${m.stage}-${m.home?.teamId}-${m.away?.teamId}`} leagueId={leagueId} matchup={m} myTeamId={myTeamId} />
+      ))}
+    </aside>
   );
 }
 
@@ -224,7 +253,10 @@ function PlayerCell({
       }`}
     >
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{shortName(player.name)}</span>
+        <span className="block truncate text-sm font-medium">
+          <span className="lg:hidden">{shortName(player.name)}</span>
+          <span className="hidden lg:inline">{player.name}</span>
+        </span>
         {detail.text && (
           <span className={`line-clamp-2 block text-[11px] leading-snug text-muted ${detail.tone}`}>{detail.text}</span>
         )}

@@ -30,33 +30,35 @@ export function AdminPlayersPage() {
   if (!me?.isAdmin) return <Navigate to="/leagues" replace />;
 
   return (
-    <AppShell title="Player positions" back="/profile">
+    <AppShell title="Player positions" back="/profile" width="wide">
       <p className="text-sm text-muted">
         Positions come from where each player started last season. Set an override for players with none, or to make
         someone dual-position. Overrides are never changed by the weekly import.
       </p>
 
-      <div className="flex gap-2" role="tablist" aria-label="Filter players">
-        {FILTERS.map(([f, label]) => (
-          <button
-            key={f}
-            role="tab"
-            aria-selected={filter === f}
-            onClick={() => setFilter(f)}
-            className={`min-h-11 rounded-full px-4 text-sm font-medium ${filter === f ? "bg-accent text-bg" : "bg-surface-2 text-muted"}`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+        <div className="flex gap-2" role="tablist" aria-label="Filter players">
+          {FILTERS.map(([f, label]) => (
+            <button
+              key={f}
+              role="tab"
+              aria-selected={filter === f}
+              onClick={() => setFilter(f)}
+              className={`min-h-11 rounded-full px-4 text-sm font-medium ${filter === f ? "bg-accent text-bg" : "bg-surface-2 text-muted"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <input
+          type="search"
+          className={`${inputClass} lg:ml-auto lg:w-80`}
+          placeholder="Search players"
+          aria-label="Search players"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
       </div>
-      <input
-        type="search"
-        className={inputClass}
-        placeholder="Search players"
-        aria-label="Search players"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
 
       {players.isPending && <Spinner />}
       <ErrorText error={players.error} />
@@ -65,7 +67,7 @@ export function AdminPlayersPage() {
           {filter === "missing" && !query ? "Every player has a position." : "No players found."}
         </Card>
       )}
-      <ul className="flex flex-col gap-3">
+      <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
         {players.data?.map((p) => (
           <li key={p.id}>
             <PlayerRow player={p} />
@@ -95,7 +97,7 @@ function PlayerRow({ player }: { player: AdminPlayer }) {
   const sorted = NRL_POSITIONS.filter((p) => selected.includes(p));
 
   return (
-    <Card className="flex flex-col gap-3">
+    <Card className="flex h-full flex-col gap-3">
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate font-semibold">{player.name}</div>

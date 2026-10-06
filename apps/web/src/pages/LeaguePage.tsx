@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { seasonRounds, squadSize, type LeagueDetail } from "@nrl/shared";
 import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
-import { LeagueNav } from "../components/LeagueNav.tsx";
 import { formatPoints, useRound, useSeason } from "../lib/season.ts";
 import { MatchupCard } from "./MatchupsPage.tsx";
 import { scoringSummary } from "../components/ScoringEditor.tsx";
@@ -20,48 +19,81 @@ export function LeaguePage() {
   const open = league.teamCount - league.teamsJoined;
   const inSeason = league.status === "inSeason" || league.status === "complete";
   return (
-    <AppShell title={league.name} back="/leagues">
-      {inSeason && <ThisRoundCard league={league} />}
-      <DraftCard league={league} />
-      {league.status === "setup" && <InviteCard league={league} spotsLeft={open} />}
+    <AppShell title={league.name} back="/leagues" width="wide" league={inSeason ? { id: league.id, myTeamId: league.myTeamId } : undefined}>
+      {/* Desktop: what to do now on the left; who's in it and the rules on the right. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6">
+        <div className="flex flex-col gap-4">
+          {inSeason && <ThisRoundCard league={league} />}
+          <DraftCard league={league} />
+          {league.status === "setup" && <InviteCard league={league} spotsLeft={open} />}
+          {league.status === "setup" && (
+            <Card>
+              <SectionTitle>Draft order</SectionTitle>
+              <DraftOrderList league={league} />
+            </Card>
+          )}
+          <SettingsSummary league={league} className="hidden lg:block" />
+        </div>
 
-      <Card>
-        <SectionTitle>
-          Teams · {league.teamsJoined}/{league.teamCount}
-        </SectionTitle>
-        <ul className="flex flex-col divide-y divide-border">
-          {league.teams.map((t) => (
-            <li key={t.id} className="flex items-center gap-3 py-3">
-              <Avatar name={t.owner.name} image={t.owner.image} size={36} />
-              <div className="min-w-0 flex-1">
-                {t.id === league.myTeamId ? <MyTeamName league={league} /> : <div className="truncate font-medium">{t.name}</div>}
-                <div className="truncate text-sm text-muted">
-                  {t.owner.name}
-                  {t.isCommissioner ? " · Commissioner" : ""}
-                </div>
-              </div>
-            </li>
-          ))}
-          {Array.from({ length: open }, (_, i) => (
-            <li key={`open-${i}`} className="flex items-center gap-3 py-3 text-muted">
-              <span className="size-9 rounded-full border border-dashed border-border" aria-hidden />
-              Open spot
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      {league.status === "setup" && (
-        <Card>
-          <SectionTitle>Draft order</SectionTitle>
-          <DraftOrderList league={league} />
-        </Card>
-      )}
-
-      <SettingsSummary league={league} />
-      {/* Room for the league tab bar. */}
-      {inSeason && <div className="h-16 shrink-0" aria-hidden />}
+        <div className="flex flex-col gap-4">
+          {inSeason && <LadderSnapshot league={league} />}
+          <Card>
+            <SectionTitle>
+              Teams · {league.teamsJoined}/{league.teamCount}
+            </SectionTitle>
+            <ul className="flex flex-col divide-y divide-border">
+              {league.teams.map((t) => (
+                <li key={t.id} className="flex items-center gap-3 py-3">
+                  <Avatar name={t.owner.name} image={t.owner.image} size={36} />
+                  <div className="min-w-0 flex-1">
+                    {t.id === league.myTeamId ? <MyTeamName league={league} /> : <div className="truncate font-medium">{t.name}</div>}
+                    <div className="truncate text-sm text-muted">
+                      {t.owner.name}
+                      {t.isCommissioner ? " · Commissioner" : ""}
+                    </div>
+                  </div>
+                </li>
+              ))}
+              {Array.from({ length: open }, (_, i) => (
+                <li key={`open-${i}`} className="flex items-center gap-3 py-3 text-muted">
+                  <span className="size-9 rounded-full border border-dashed border-border" aria-hidden />
+                  Open spot
+                </li>
+              ))}
+            </ul>
+          </Card>
+          <SettingsSummary league={league} className="lg:hidden" />
+        </div>
+      </div>
     </AppShell>
+  );
+}
+
+/** Desktop sidebar: the top of the ladder, linking to the full one. */
+function LadderSnapshot({ league }: { league: LeagueDetail }) {
+  const season = useSeason(league.id);
+  if (!season.data) return null;
+  const s = season.data;
+  const h2h = s.mode === "headToHead";
+  return (
+    <Card className="hidden lg:block">
+      <div className="mb-3 flex items-center justify-between">
+        <SectionTitle>Ladder</SectionTitle>
+        <Link to={`/l/${league.id}/ladder`} className="text-sm font-medium text-accent">
+          Full ladder →
+        </Link>
+      </div>
+      <ol className="flex flex-col text-sm">
+        {s.ladder.slice(0, 8).map((r) => (
+          <li key={r.teamId} className={`flex items-center gap-3 py-1.5 ${r.teamId === s.myTeamId ? "text-accent" : ""}`}>
+            <span className="w-5 text-right font-mono text-xs text-muted">{r.rank}</span>
+            <span className="min-w-0 flex-1 truncate">{r.name}</span>
+            {h2h && <span className="font-mono text-xs text-muted">{r.wins}-{r.draws}-{r.losses}</span>}
+            <span className="w-14 text-right font-mono">{formatPoints(r.pointsFor)}</span>
+          </li>
+        ))}
+      </ol>
+    </Card>
   );
 }
 
@@ -101,7 +133,6 @@ function ThisRoundCard({ league }: { league: LeagueDetail }) {
       >
         {r.status === "complete" ? "See your team" : "Set your lineup"}
       </Link>
-      <LeagueNav leagueId={league.id} myTeamId={s.myTeamId} />
     </>
   );
 }
@@ -213,7 +244,7 @@ function MyTeamName({ league }: { league: LeagueDetail }) {
   );
 }
 
-function SettingsSummary({ league }: { league: LeagueDetail }) {
+function SettingsSummary({ league, className }: { league: LeagueDetail; className?: string }) {
   const s = league.settings;
   const format =
     s.matchups.mode === "totalPoints"
@@ -222,7 +253,7 @@ function SettingsSummary({ league }: { league: LeagueDetail }) {
         ? `Head-to-head, top ${s.matchups.finalsTeams} finals`
         : "Head-to-head, no finals";
   return (
-    <Card>
+    <Card className={className}>
       <div className="mb-3 flex items-center justify-between">
         <SectionTitle>Rules</SectionTitle>
         {league.isCommissioner && league.status === "setup" && (

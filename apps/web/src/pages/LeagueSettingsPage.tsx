@@ -58,20 +58,20 @@ function SettingsForm({ league, limits }: { league: LeagueDetail; limits: Settin
   }
 
   return (
-    <AppShell title="League settings" back={`/l/${league.id}`}>
+    <AppShell title="League settings" back={`/l/${league.id}`} width="wide">
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <Card>
-          <Field label="League name">
-            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={40} required />
-          </Field>
-        </Card>
-
-        {locked ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
           <Card>
-            <p className="text-sm text-muted">Rules are locked once the draft has started.</p>
+            <Field label="League name">
+              <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={40} required />
+            </Field>
           </Card>
-        ) : (
-          <>
+
+          {locked ? (
+            <Card>
+              <p className="text-sm text-muted">Rules are locked once the draft has started.</p>
+            </Card>
+          ) : (
             <Card className="flex flex-col gap-4">
               <SectionTitle>Draft</SectionTitle>
               <DraftScheduleFields
@@ -97,18 +97,18 @@ function SettingsForm({ league, limits }: { league: LeagueDetail; limits: Settin
                 <p className="text-sm text-muted">Save to start arranging the order.</p>
               )}
             </Card>
-            <SettingsEditor value={settings} onChange={setSettings} minTeams={league.teamsJoined} limits={limits} />
-          </>
-        )}
+          )}
+        </div>
+        {!locked && <SettingsEditor value={settings} onChange={setSettings} minTeams={league.teamsJoined} limits={limits} />}
 
         <ErrorText error={formError ?? update.error} />
-        <Button type="submit" disabled={update.isPending} className="sticky bottom-4 shadow-lg">
+        <Button type="submit" disabled={update.isPending} className="sticky bottom-4 shadow-lg lg:w-64 lg:self-end">
           {update.isPending ? "Saving…" : "Save"}
         </Button>
       </form>
 
       {!locked && (
-        <Card>
+        <Card className="lg:w-1/2">
           <SectionTitle>Invite link</SectionTitle>
           <p className="mb-3 text-sm text-muted">Reset the link if it's been shared too widely. The old link stops working.</p>
           <Button variant="secondary" onClick={() => resetInvite.mutate()} disabled={resetInvite.isPending}>

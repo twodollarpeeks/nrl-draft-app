@@ -15,6 +15,8 @@
   --color-pos-ob: #f6a04d;
   /* Scores still in review (stats being checked after full time). */
   --color-review: #f5c04a;
+  /* Your team's column on the draft board: the accent at 15% over the page, solid so it can pin. */
+  --color-mine: color-mix(in oklab, #22d3a6 15%, #0b0f17);
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 

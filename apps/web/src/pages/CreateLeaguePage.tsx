@@ -54,36 +54,38 @@ function CreateLeagueForm({ defaults }: { defaults: LeagueDefaults }) {
   }
 
   return (
-    <AppShell title="New league" back="/leagues">
+    <AppShell title="New league" back="/leagues" width="wide">
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <Card className="flex flex-col gap-4">
-          <Field label="League name">
-            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="The Boys" maxLength={40} required />
-          </Field>
-          <Field label="Your team name" hint="Optional, you can change it later">
-            <input className={inputClass} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Leave blank for “Your name's Team”" maxLength={30} />
-          </Field>
-          <Field label="Season">
-            <select className={inputClass} value={season} onChange={(e) => setSeason(Number(e.target.value))}>
-              {SEASONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                  {s === THIS_YEAR ? " (replay with real stats)" : ""}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </Card>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+          <Card className="flex flex-col gap-4">
+            <Field label="League name">
+              <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="The Boys" maxLength={40} required />
+            </Field>
+            <Field label="Your team name" hint="Optional, you can change it later">
+              <input className={inputClass} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Leave blank for “Your name's Team”" maxLength={30} />
+            </Field>
+            <Field label="Season">
+              <select className={inputClass} value={season} onChange={(e) => setSeason(Number(e.target.value))}>
+                {SEASONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                    {s === THIS_YEAR ? " (replay with real stats)" : ""}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </Card>
 
-        <Card>
-          <SectionTitle>Draft</SectionTitle>
-          <DraftScheduleFields draftAt={draftAt} onDraftAt={setDraftAt} mode={orderMode} onMode={setOrderMode} />
-        </Card>
+          <Card>
+            <SectionTitle>Draft</SectionTitle>
+            <DraftScheduleFields draftAt={draftAt} onDraftAt={setDraftAt} mode={orderMode} onMode={setOrderMode} />
+          </Card>
+        </div>
 
         <SettingsEditor value={settings} onChange={setSettings} limits={defaults} />
 
         <ErrorText error={formError ?? create.error} />
-        <Button type="submit" disabled={create.isPending} className="sticky bottom-4 shadow-lg">
+        <Button type="submit" disabled={create.isPending} className="sticky bottom-4 shadow-lg lg:w-64 lg:self-end">
           {create.isPending ? "Creating…" : "Create league"}
         </Button>
       </form>

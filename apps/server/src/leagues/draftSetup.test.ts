@@ -180,10 +180,16 @@ describe.runIf(hasTestDb)("draft time and draft order", () => {
       });
     }, 60_000);
 
-    it("doesn't start with fewer than 2 teams", async () => {
+    it("doesn't start with fewer than 4 teams, on time or by hand", async () => {
       const l = await league({ draftAt: "2026-10-01T12:00:00Z" });
+      for (const n of ["B", "C"]) await l.join(n);
       clock = new Date("2026-10-01T12:05:00Z");
       expect(await (await engine()).autoStartIfDue(l.id)).toBe(false);
+      expect(await call(l.owner.id, "POST", `/api/leagues/${l.id}/draft/start`)).toMatchObject({
+        status: 409, body: { error: "not_enough_teams" },
+      });
+      // Still in setup and still loadable.
+      expect(await call(l.owner.id, "GET", `/api/leagues/${l.id}`)).toMatchObject({ status: 200, body: { status: "setup" } });
     });
 
     it("re-arms scheduled starts after a restart", async () => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-import type { DraftPlayer, DraftState, LeagueDetail, NrlPosition } from "@nrl/shared";
+import { MIN_TEAMS, type DraftPlayer, type DraftState, type LeagueDetail, type NrlPosition } from "@nrl/shared";
 import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
 import { ClockBar } from "../components/draft/ClockBar.tsx";
 import { BoardPanel, QueuePanel, TeamPanel, picksUntil } from "../components/draft/Panels.tsx";
@@ -59,6 +59,9 @@ function Room({
   const [commishMode, setCommishMode] = useState(false);
   const { queue: savedQueue, update: updateQueue, error: queueError } = useQueue(leagueId);
   const wide = useMediaQuery("(min-width: 1024px)");
+  const xl = useMediaQuery("(min-width: 1280px)");
+  // Desktop below xl has room for one of players/board beside the sidebar.
+  const [deskTab, setDeskTab] = useState<"players" | "board">("players");
 
   const pick = useDraftAction<{ pickNo: number; playerId: number }>(leagueId, "pick", (v) => v);
   const autopilot = useDraftAction<boolean>(leagueId, "autopilot", (on) => ({ on }));
@@ -113,12 +116,17 @@ function Room({
   );
   const queuePanel = <QueuePanel queue={queue} players={byId} takenBy={takenBy} onChange={(ids) => updateQueue(() => ids)} />;
   const teamPanel = <TeamPanel state={state} players={byId} template={template} teamId={myTeamId} />;
-  const board = <BoardPanel state={state} players={byId} myTeamId={myTeamId} />;
+  const board = <BoardPanel state={state} players={byId} myTeamId={myTeamId} fill={wide} />;
+  const preDraft = state.status === "pending" && (
+    <PreDraft league={league} onStart={() => start.mutate()} starting={start.isPending} />
+  );
+  const column = "flex min-h-0 flex-col gap-4 overflow-y-auto";
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-6xl flex-col">
-      <header className="sticky top-0 z-20 bg-bg">
-        <div className="flex items-center gap-3 border-b border-border px-4 py-2">
+    // Desktop: the room fills the window and each column scrolls on its own.
+    <div className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
+      <header className="sticky top-0 z-20 shrink-0 bg-bg">
+        <div className="flex items-center gap-3 border-b border-border px-4 py-2 lg:px-6">
           <Link to={`/l/${leagueId}`} className="-ml-2 rounded-lg px-2 py-1 text-muted hover:text-text" aria-label="Back to league">
             ←
           </Link>
@@ -126,7 +134,7 @@ function Room({
         </div>
         <ClockBar state={state} myTeamId={myTeamId} picksUntilMine={until} connection={connection} />
         {onAutopilot && state.status !== "complete" && (
-          <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-2 px-4 py-2 text-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-2 px-4 py-2 text-sm lg:px-6">
             <span>You're on autopick: your queue, then best available.</span>
             <Button variant="secondary" className="min-h-9" onClick={() => autopilot.mutate(false)} disabled={autopilot.isPending}>
               I'm back
@@ -148,15 +156,13 @@ function Room({
         </nav>
       </header>
 
-      <main className="flex flex-1 flex-col gap-4 px-4 py-4">
+      <main className="flex flex-1 flex-col gap-4 px-4 py-4 lg:min-h-0 lg:px-6">
         {socketError && <ErrorText error={socketError} />}
         <ErrorText error={actionError} />
 
-        {state.status === "pending" && (
-          <PreDraft league={league} onStart={() => start.mutate()} starting={start.isPending} />
-        )}
+        {!wide && preDraft}
         {state.status === "complete" && (
-          <Card className="flex items-center justify-between gap-3">
+          <Card className="flex shrink-0 items-center justify-between gap-3">
             <div>
               <div className="font-semibold">The draft is done 🏉</div>
               <div className="text-sm text-muted">Every team has its squad. Set your lineup before round 1.</div>
@@ -180,14 +186,43 @@ function Room({
           />
         )}
 
-        {/* Mobile: tabs. Desktop: board + players on the left, queue + team on the right. */}
+        {/* Phones: tabs. Desktop: players | board | queue + team, or players/board as tabs when narrower. */}
         {wide ? (
-          <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-6">
-            <div className="flex min-w-0 flex-col gap-6">
-              {board}
-              {playerList}
-            </div>
-            <aside className="flex flex-col gap-6">
+          <div
+            className={`grid min-h-0 flex-1 gap-6 ${
+              xl ? "grid-cols-[360px_minmax(0,1fr)_320px]" : "grid-cols-[minmax(0,1fr)_320px]"
+            }`}
+          >
+            {xl ? (
+              <>
+                <section className={column} aria-label="Players">
+                  {playerList}
+                </section>
+                {/* Before the draft there's no board yet: the start card takes its place. */}
+                <section className="flex min-h-0 flex-col" aria-label="Draft board">
+                  {preDraft ? <div className="max-w-xl">{preDraft}</div> : board}
+                </section>
+              </>
+            ) : (
+              <section className="flex min-h-0 flex-col gap-3">
+                <div className="flex shrink-0 gap-2" role="tablist">
+                  {(["players", "board"] as const).map((t) => (
+                    <button
+                      key={t}
+                      role="tab"
+                      aria-selected={deskTab === t}
+                      onClick={() => setDeskTab(t)}
+                      className={`min-h-9 rounded-full px-4 text-sm font-medium ${deskTab === t ? "bg-accent text-bg" : "bg-surface-2 text-muted"}`}
+                    >
+                      {t === "players" ? "Players" : "Board"}
+                    </button>
+                  ))}
+                </div>
+                {deskTab === "players" ? <div className={column}>{playerList}</div> : board}
+              </section>
+            )}
+            <aside className={`${column} gap-6`}>
+              {!xl && preDraft}
               <section>
                 <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Queue</h2>
                 {queuePanel}
@@ -196,20 +231,27 @@ function Room({
                 <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">My team</h2>
                 {teamPanel}
               </section>
+              {!onAutopilot && state.status === "live" && (
+                <button className="self-start text-xs text-muted underline" onClick={() => autopilot.mutate(true)}>
+                  Step away: autopick for me
+                </button>
+              )}
             </aside>
           </div>
         ) : (
-          <div>
-            {tab === "players" && playerList}
-            {tab === "queue" && queuePanel}
-            {tab === "board" && board}
-            {tab === "team" && teamPanel}
-          </div>
-        )}
-        {!onAutopilot && state.status === "live" && (
-          <button className="self-start text-xs text-muted underline" onClick={() => autopilot.mutate(true)}>
-            Step away: autopick for me
-          </button>
+          <>
+            <div>
+              {tab === "players" && playerList}
+              {tab === "queue" && queuePanel}
+              {tab === "board" && board}
+              {tab === "team" && teamPanel}
+            </div>
+            {!onAutopilot && state.status === "live" && (
+              <button className="self-start text-xs text-muted underline" onClick={() => autopilot.mutate(true)}>
+                Step away: autopick for me
+              </button>
+            )}
+          </>
         )}
       </main>
     </div>
@@ -236,16 +278,22 @@ function PreDraft({ league, onStart, starting }: { league: LeagueDetail; onStart
       </div>
       {league.isCommissioner ? (
         <>
-          {league.teamsJoined < league.teamCount && (
+          {league.teamsJoined < MIN_TEAMS ? (
             <p className="text-sm text-muted">
-              Only {league.teamsJoined} of {league.teamCount} spots are filled. Starting now drafts with {league.teamsJoined} teams.
+              You need at least {MIN_TEAMS} teams to draft. {league.teamsJoined} of {league.teamCount} have joined.
             </p>
+          ) : (
+            league.teamsJoined < league.teamCount && (
+              <p className="text-sm text-muted">
+                Only {league.teamsJoined} of {league.teamCount} spots are filled. Starting now drafts with {league.teamsJoined} teams.
+              </p>
+            )
           )}
           <Button
             onClick={() => {
               if (confirm(`Start the draft with ${league.teamsJoined} teams? Rules lock and nobody else can join.`)) onStart();
             }}
-            disabled={starting || league.teamsJoined < 2}
+            disabled={starting || league.teamsJoined < MIN_TEAMS}
           >
             {starting ? "Starting…" : "Start the draft"}
           </Button>

@@ -75,137 +75,139 @@ export function SettingsEditor({
   const allowedStats = new Set(limits.commissionerStats);
 
   return (
-    <>
-      <Card>
-        <SectionTitle>League</SectionTitle>
-        <div className="flex flex-col gap-4">
-          <Row label="Teams" hint={`${MIN_TEAMS}–${MAX_TEAMS}`}>
-            <Stepper
-              label="Teams"
-              value={value.teamCount}
-              min={Math.max(MIN_TEAMS, minTeams)}
-              max={MAX_TEAMS}
-              onChange={(n) =>
-                onChange({
-                  ...value,
-                  teamCount: n,
-                  // Fewer teams than finals spots: shrink the finals to fit.
-                  matchups:
-                    value.matchups.mode === "headToHead"
-                      ? { ...value.matchups, finalsTeams: fitFinalsToTeams(value.matchups.finalsTeams, n) }
-                      : value.matchups,
-                })
-              }
-            />
-          </Row>
-          <Row label="Pick timer" hint={can.draftTimer ? undefined : LOCKED}>
-            {!can.draftTimer ? (
-              <span className="text-sm">{PICK_TIMES.find(([s]) => s === value.draft.pickSeconds)?.[1] ?? `${value.draft.pickSeconds}s`}</span>
-            ) : (
-            <select
-              className={inputClass}
-              value={value.draft.pickSeconds}
-              onChange={(e) => set("draft", { ...value.draft, pickSeconds: Number(e.target.value) })}
-            >
-              {PICK_TIMES.map(([s, label]) => (
-                <option key={s} value={s}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            )}
-          </Row>
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-medium">Format{can.format ? "" : ` · ${LOCKED}`}</legend>
-            {(
-              [
-                ["h2hFinals", "Head-to-head + finals", "Weekly matchups, then a finals series"],
-                ["h2h", "Head-to-head, no finals", "Top of the ladder after the season wins"],
-                ["total", "Total points", "No matchups; most points over the season wins"],
-              ] as const
-            ).map(([choice, label, hint]) => (
-              <label
-                key={choice}
-                className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 has-checked:border-accent has-disabled:cursor-default has-disabled:opacity-60"
-              >
-                <input
-                  type="radio"
-                  name="format"
-                  disabled={!can.format}
-                  className="mt-1 accent-(--color-accent)"
-                  checked={matchupChoice(value.matchups) === choice}
-                  onChange={() => set("matchups", matchupsFor(choice, value.matchups, value.teamCount))}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium">{label}</span>
-                  <span className="block text-xs text-muted">{hint}</span>
-                  {choice === "h2hFinals" && value.matchups.mode === "headToHead" && value.matchups.finalsTeams > 0 && (
-                    <span className="mt-2 flex flex-col gap-1">
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="text-sm">Finals teams</span>
-                        <select
-                          className={inputClass}
-                          aria-label="Number of finals teams"
-                          disabled={!can.format}
-                          value={value.matchups.finalsTeams}
-                          onChange={(e) =>
-                            set("matchups", { ...value.matchups, finalsTeams: Number(e.target.value) as FinalsSize } as MatchupSettings)
-                          }
-                        >
-                          {FINALS_SIZES.map((n) => (
-                            <option key={n} value={n} disabled={n > value.teamCount}>
-                              Top {n}
-                              {n > value.teamCount ? ` (needs ${n}+ teams)` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </span>
-                      <span className="text-xs text-muted">{FINALS_DESCRIPTIONS[value.matchups.finalsTeams as FinalsSize]}</span>
-                    </span>
-                  )}
-                </span>
-              </label>
-            ))}
-          </fieldset>
-          <SeasonEnd value={value} disabled={!can.format} onChange={(seasonEndRound) => set("seasonEndRound", seasonEndRound)} />
-        </div>
-      </Card>
-
-      <Card>
-        <SectionTitle>Squad · {squadSize(roster)} players</SectionTitle>
-        {!can.roster ? (
-          <p className="text-sm">
-            {roster.slots.map((s) => `${s.count} ${s.label}`).join(", ")}, {roster.benchSize} bench
-            <span className="block text-xs text-muted">{LOCKED}</span>
-          </p>
-        ) : (
-        <div className="flex flex-col gap-3">
-          {roster.slots.map((slot, i) => (
-            <Row key={slot.key} label={slot.label} hint={slot.eligible.join(" · ")}>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+      <div className="flex flex-col gap-4">
+        <Card>
+          <SectionTitle>League</SectionTitle>
+          <div className="flex flex-col gap-4">
+            <Row label="Teams" hint={`${MIN_TEAMS}–${MAX_TEAMS}`}>
               <Stepper
-                label={slot.label}
-                value={slot.count}
-                min={1}
-                max={6}
-                onChange={(count) => {
-                  const slots = roster.slots.map((s, j) => (j === i ? { ...s, count } : s));
-                  set("roster", { ...roster, slots });
-                }}
+                label="Teams"
+                value={value.teamCount}
+                min={Math.max(MIN_TEAMS, minTeams)}
+                max={MAX_TEAMS}
+                onChange={(n) =>
+                  onChange({
+                    ...value,
+                    teamCount: n,
+                    // Fewer teams than finals spots: shrink the finals to fit.
+                    matchups:
+                      value.matchups.mode === "headToHead"
+                        ? { ...value.matchups, finalsTeams: fitFinalsToTeams(value.matchups.finalsTeams, n) }
+                        : value.matchups,
+                  })
+                }
               />
             </Row>
-          ))}
-          <Row label="Bench" hint="Emergencies, in order">
-            <Stepper
-              label="Bench"
-              value={roster.benchSize}
-              min={0}
-              max={10}
-              onChange={(benchSize) => set("roster", { ...roster, benchSize })}
-            />
-          </Row>
-        </div>
-        )}
-      </Card>
+            <Row label="Pick timer" hint={can.draftTimer ? undefined : LOCKED}>
+              {!can.draftTimer ? (
+                <span className="text-sm">{PICK_TIMES.find(([s]) => s === value.draft.pickSeconds)?.[1] ?? `${value.draft.pickSeconds}s`}</span>
+              ) : (
+              <select
+                className={inputClass}
+                value={value.draft.pickSeconds}
+                onChange={(e) => set("draft", { ...value.draft, pickSeconds: Number(e.target.value) })}
+              >
+                {PICK_TIMES.map(([s, label]) => (
+                  <option key={s} value={s}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              )}
+            </Row>
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 text-sm font-medium">Format{can.format ? "" : ` · ${LOCKED}`}</legend>
+              {(
+                [
+                  ["h2hFinals", "Head-to-head + finals", "Weekly matchups, then a finals series"],
+                  ["h2h", "Head-to-head, no finals", "Top of the ladder after the season wins"],
+                  ["total", "Total points", "No matchups; most points over the season wins"],
+                ] as const
+              ).map(([choice, label, hint]) => (
+                <label
+                  key={choice}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 has-checked:border-accent has-disabled:cursor-default has-disabled:opacity-60"
+                >
+                  <input
+                    type="radio"
+                    name="format"
+                    disabled={!can.format}
+                    className="mt-1 accent-(--color-accent)"
+                    checked={matchupChoice(value.matchups) === choice}
+                    onChange={() => set("matchups", matchupsFor(choice, value.matchups, value.teamCount))}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">{label}</span>
+                    <span className="block text-xs text-muted">{hint}</span>
+                    {choice === "h2hFinals" && value.matchups.mode === "headToHead" && value.matchups.finalsTeams > 0 && (
+                      <span className="mt-2 flex flex-col gap-1">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-sm">Finals teams</span>
+                          <select
+                            className={inputClass}
+                            aria-label="Number of finals teams"
+                            disabled={!can.format}
+                            value={value.matchups.finalsTeams}
+                            onChange={(e) =>
+                              set("matchups", { ...value.matchups, finalsTeams: Number(e.target.value) as FinalsSize } as MatchupSettings)
+                            }
+                          >
+                            {FINALS_SIZES.map((n) => (
+                              <option key={n} value={n} disabled={n > value.teamCount}>
+                                Top {n}
+                                {n > value.teamCount ? ` (needs ${n}+ teams)` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </span>
+                        <span className="text-xs text-muted">{FINALS_DESCRIPTIONS[value.matchups.finalsTeams as FinalsSize]}</span>
+                      </span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+            <SeasonEnd value={value} disabled={!can.format} onChange={(seasonEndRound) => set("seasonEndRound", seasonEndRound)} />
+          </div>
+        </Card>
+
+        <Card>
+          <SectionTitle>Squad · {squadSize(roster)} players</SectionTitle>
+          {!can.roster ? (
+            <p className="text-sm">
+              {roster.slots.map((s) => `${s.count} ${s.label}`).join(", ")}, {roster.benchSize} bench
+              <span className="block text-xs text-muted">{LOCKED}</span>
+            </p>
+          ) : (
+          <div className="flex flex-col gap-3">
+            {roster.slots.map((slot, i) => (
+              <Row key={slot.key} label={slot.label} hint={slot.eligible.join(" · ")}>
+                <Stepper
+                  label={slot.label}
+                  value={slot.count}
+                  min={1}
+                  max={6}
+                  onChange={(count) => {
+                    const slots = roster.slots.map((s, j) => (j === i ? { ...s, count } : s));
+                    set("roster", { ...roster, slots });
+                  }}
+                />
+              </Row>
+            ))}
+            <Row label="Bench" hint="Emergencies, in order">
+              <Stepper
+                label="Bench"
+                value={roster.benchSize}
+                min={0}
+                max={10}
+                onChange={(benchSize) => set("roster", { ...roster, benchSize })}
+              />
+            </Row>
+          </div>
+          )}
+        </Card>
+      </div>
 
       <Card>
         <SectionTitle>Scoring</SectionTitle>
@@ -224,7 +226,7 @@ export function SettingsEditor({
           />
         )}
       </Card>
-    </>
+    </div>
   );
 }
 

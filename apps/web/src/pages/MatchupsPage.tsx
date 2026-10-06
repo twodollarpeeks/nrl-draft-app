@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from "react-router";
 import type { MatchupSide, MatchupView } from "@nrl/shared";
 import { AppShell } from "../components/Layout.tsx";
-import { LeagueNav, RoundPicker } from "../components/LeagueNav.tsx";
+import { RoundPicker } from "../components/LeagueNav.tsx";
 import { Card, ErrorText, SectionTitle, Spinner } from "../components/ui.tsx";
 import { formatPoints, useRound, useSeason } from "../lib/season.ts";
 
@@ -24,19 +24,21 @@ export function MatchupsPage() {
   const totalPoints = s.mode === "totalPoints";
 
   return (
-    <AppShell title={totalPoints ? "Scores" : "Matchups"} back={`/l/${id}`}>
-      <div className="flex flex-col gap-4 pb-20">
-        <RoundPicker
-          round={v.round}
-          first={s.firstRound}
-          last={s.grandFinalRound ?? s.lastRegularRound}
-          title={v.title}
-          status={v.status}
-          onChange={(r) => navigate(`/l/${id}/matchups/${r}`)}
-        />
+    <AppShell title={totalPoints ? "Scores" : "Matchups"} back={`/l/${id}`} width="wide" league={{ id, myTeamId: s.myTeamId }}>
+      <div className="flex flex-col gap-4">
+        <div className="lg:mx-auto lg:w-full lg:max-w-md">
+          <RoundPicker
+            round={v.round}
+            first={s.firstRound}
+            last={s.grandFinalRound ?? s.lastRegularRound}
+            title={v.title}
+            status={v.status}
+            onChange={(r) => navigate(`/l/${id}/matchups/${r}`)}
+          />
+        </div>
 
         {totalPoints ? (
-          <Card>
+          <Card className="lg:mx-auto lg:w-full lg:max-w-2xl">
             <SectionTitle>This round</SectionTitle>
             <ol className="flex flex-col divide-y divide-border">
               {v.scores.map((side, i) => (
@@ -51,7 +53,7 @@ export function MatchupsPage() {
             {v.round > s.lastRegularRound ? "Finals matchups are set once the regular season ends." : "No matchups this round."}
           </Card>
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
             {v.matchups.map((m) => (
               <li key={`${m.stage}-${m.home?.teamId}-${m.away?.teamId}`}>
                 <MatchupCard leagueId={id} matchup={m} myTeamId={s.myTeamId} />
@@ -60,7 +62,6 @@ export function MatchupsPage() {
           </ul>
         )}
       </div>
-      <LeagueNav leagueId={id} myTeamId={s.myTeamId} />
     </AppShell>
   );
 }

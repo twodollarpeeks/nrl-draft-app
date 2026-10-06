@@ -9,7 +9,7 @@ export function LeaguesPage() {
   const { data: leagues, isPending, error } = useMyLeagues();
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Your leagues</h1>
         <Link
@@ -30,20 +30,20 @@ export function LeaguesPage() {
         </Card>
       )}
 
-      <ul className="flex flex-col gap-3">
+      <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
         {leagues?.map((l) => (
           <li key={l.id}>
             <Link
               to={`/l/${l.id}`}
-              className="flex items-center justify-between rounded-2xl border border-border bg-surface p-4 hover:border-accent"
+              className="flex h-full items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-accent"
             >
-              <div>
-                <div className="font-semibold">{l.name}</div>
+              <div className="min-w-0">
+                <div className="truncate font-semibold">{l.name}</div>
                 <div className="text-sm text-muted">
                   {l.season} · {l.teamsJoined}/{l.teamCount} teams{l.isCommissioner ? " · Commissioner" : ""}
                 </div>
               </div>
-              <span className="rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-muted">{STATUS_LABEL[l.status]}</span>
+              <span className="shrink-0 rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-muted">{STATUS_LABEL[l.status]}</span>
             </Link>
           </li>
         ))}

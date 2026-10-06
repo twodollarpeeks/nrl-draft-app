@@ -63,81 +63,85 @@ function Editor({ saved }: { saved: SiteConfig }) {
     setDraft({ ...draft, commissionerCan: { ...draft.commissionerCan, [key]: on } });
 
   return (
-    <AppShell title="Scoring & permissions" back="/profile">
+    <AppShell title="Scoring & permissions" back="/profile" width="wide">
       <p className="text-sm text-muted">
         New leagues start with this scoring. Existing leagues keep theirs. Commissioners can change only what you allow
         here; the server enforces it. As a site admin, these limits don't apply to your own leagues.
       </p>
 
-      <Card>
-        <SectionTitle>What commissioners can change</SectionTitle>
-        <ul className="flex flex-col divide-y divide-border">
-          {PERMISSIONS.map(([key, label, hint]) => (
-            <li key={key} className="flex items-center justify-between gap-3 py-3">
-              <div>
-                <div className="text-sm font-medium">{label}</div>
-                <div className="text-xs text-muted">{hint}</div>
-              </div>
-              <Switch label={label} checked={draft.commissionerCan[key]} onChange={(on) => setPermission(key, on)} />
-            </li>
-          ))}
-        </ul>
-        <p className="mt-2 text-xs text-muted">League size is always the commissioner's call.</p>
-      </Card>
-
-      <Card>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <SectionTitle>Default scoring</SectionTitle>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              className="min-h-9"
-              onClick={() => setDraft({ ...draft, defaultScoring: { ...DEFAULT_SCORING } })}
-            >
-              Use recommended
-            </Button>
+      {/* Desktop: the scoring editor on the left; permissions and the live preview alongside. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-6">
+        <Card>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <SectionTitle>Default scoring</SectionTitle>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                className="min-h-9"
+                onClick={() => setDraft({ ...draft, defaultScoring: { ...DEFAULT_SCORING } })}
+              >
+                Use recommended
+              </Button>
+            </div>
           </div>
+          {draft.commissionerCan.scoring && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+              <span>“Commish” = commissioners may change that stat ({allowed.size} of {SCORING_STATS.length}).</span>
+              <button className="underline" onClick={() => setDraft({ ...draft, commissionerStats: [...SCORING_STATS] })}>
+                Allow all
+              </button>
+              <button className="underline" onClick={() => setDraft({ ...draft, commissionerStats: [] })}>
+                Lock all
+              </button>
+            </div>
+          )}
+          <ScoringEditor
+            value={draft.defaultScoring}
+            onChange={(defaultScoring) => setDraft({ ...draft, defaultScoring })}
+            rowExtra={(stat) =>
+              draft.commissionerCan.scoring ? (
+                <label className="flex items-center gap-1 text-xs text-muted" title="Commissioners may change this stat">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-(--color-accent)"
+                    checked={allowed.has(stat)}
+                    onChange={(e) => {
+                      const next = new Set(allowed);
+                      if (e.target.checked) next.add(stat);
+                      else next.delete(stat);
+                      setDraft({ ...draft, commissionerStats: SCORING_STATS.filter((s) => next.has(s)) });
+                    }}
+                  />
+                  Commish
+                </label>
+              ) : null
+            }
+          />
+        </Card>
+        {/* Phones keep the order permissions, scoring, preview. */}
+        <div className="contents lg:sticky lg:top-20 lg:flex lg:max-h-[calc(100dvh-6rem)] lg:flex-col lg:gap-4 lg:overflow-y-auto">
+          <Card className="order-first lg:order-none">
+            <SectionTitle>What commissioners can change</SectionTitle>
+            <ul className="flex flex-col divide-y divide-border">
+              {PERMISSIONS.map(([key, label, hint]) => (
+                <li key={key} className="flex items-center justify-between gap-3 py-3">
+                  <div>
+                    <div className="text-sm font-medium">{label}</div>
+                    <div className="text-xs text-muted">{hint}</div>
+                  </div>
+                  <Switch label={label} checked={draft.commissionerCan[key]} onChange={(on) => setPermission(key, on)} />
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted">League size is always the commissioner's call.</p>
+          </Card>
+          <Preview scoring={draft.defaultScoring} />
         </div>
-        {draft.commissionerCan.scoring && (
-          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted">
-            <span>“Commish” = commissioners may change that stat ({allowed.size} of {SCORING_STATS.length}).</span>
-            <button className="underline" onClick={() => setDraft({ ...draft, commissionerStats: [...SCORING_STATS] })}>
-              Allow all
-            </button>
-            <button className="underline" onClick={() => setDraft({ ...draft, commissionerStats: [] })}>
-              Lock all
-            </button>
-          </div>
-        )}
-        <ScoringEditor
-          value={draft.defaultScoring}
-          onChange={(defaultScoring) => setDraft({ ...draft, defaultScoring })}
-          rowExtra={(stat) =>
-            draft.commissionerCan.scoring ? (
-              <label className="flex items-center gap-1 text-xs text-muted" title="Commissioners may change this stat">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-(--color-accent)"
-                  checked={allowed.has(stat)}
-                  onChange={(e) => {
-                    const next = new Set(allowed);
-                    if (e.target.checked) next.add(stat);
-                    else next.delete(stat);
-                    setDraft({ ...draft, commissionerStats: SCORING_STATS.filter((s) => next.has(s)) });
-                  }}
-                />
-                Commish
-              </label>
-            ) : null
-          }
-        />
-      </Card>
-
-      <Preview scoring={draft.defaultScoring} />
+      </div>
 
       <ErrorText error={save.error} />
       {dirty ? (
-        <div className="sticky bottom-4 flex gap-2">
+        <div className="sticky bottom-4 flex gap-2 lg:w-96 lg:self-end">
           <Button className="flex-1 shadow-lg" disabled={save.isPending} onClick={() => save.mutate(draft)}>
             {save.isPending ? "Saving…" : "Save changes"}
           </Button>

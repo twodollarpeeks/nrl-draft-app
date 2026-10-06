@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@nrl/db";
 import {
   LeagueSettings,
+  MIN_TEAMS,
   checkDraftable,
   fitFinalsToTeams,
   chooseAutopick,
@@ -164,7 +165,10 @@ export class DraftEngine {
    */
   private async startDraft(leagueId: string, actorId: string | null) {
     const league = await this.leagueWithSettings(leagueId);
-    if (league.teams.length < 2) throw conflict("not_enough_teams", "You need at least 2 teams to draft");
+    // The league's size becomes whoever joined, which the rules require to be at least MIN_TEAMS.
+    if (league.teams.length < MIN_TEAMS) {
+      throw conflict("not_enough_teams", `You need at least ${MIN_TEAMS} teams to draft`);
+    }
     if ((await this.rankedPlayers(leagueId)).length === 0) {
       throw conflict("no_players", "There's no player data for this season yet");
     }
@@ -211,14 +215,14 @@ export class DraftEngine {
   /**
    * Called when a scheduled draft time arrives. Re-checks the league (still
    * in setup, time really reached) so a stale timer does nothing. Starts with
-   * whoever has joined, as long as there are at least two teams.
+   * whoever has joined, as long as there are enough teams.
    */
   async autoStartIfDue(leagueId: string): Promise<boolean> {
     try {
       const league = await this.db.league.findUnique({ where: { id: leagueId }, include: { teams: true } });
       if (!league || league.status !== "setup" || !league.draftAt || league.draftAt > this.now()) return false;
-      if (league.teams.length < 2) {
-        this.opts.log?.info({ leagueId }, "scheduled draft time reached with fewer than 2 teams; not starting");
+      if (league.teams.length < MIN_TEAMS) {
+        this.opts.log?.info({ leagueId }, `scheduled draft time reached with fewer than ${MIN_TEAMS} teams; not starting`);
         return false;
       }
       await this.startDraft(leagueId, null);
