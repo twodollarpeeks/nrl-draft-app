@@ -74,6 +74,8 @@ Needs Node.js 22+ (developed on 24) and npm 10+. Works in PowerShell or Git Bash
    ```
 
    The web app is at http://localhost:5173 (the API runs on :3001 behind it).
+   On Windows you can double-click `start-app.bat` instead: it installs
+   packages on first run, starts both servers and opens the browser.
 
 6. Sign in with Google once, then make yourself a sample league: a finished
    draft and a fully scored 2026 season, with 7 demo managers:
