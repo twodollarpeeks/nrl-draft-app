@@ -12,6 +12,9 @@ import { DraftRoomPage } from "./pages/DraftRoomPage.tsx";
 import { LadderPage } from "./pages/LadderPage.tsx";
 import { MatchupPage } from "./pages/MatchupPage.tsx";
 import { MatchupsPage } from "./pages/MatchupsPage.tsx";
+import { MockDraftsPage } from "./pages/MockDraftsPage.tsx";
+import { MockResultPage } from "./pages/MockResultPage.tsx";
+import { MockRoomPage } from "./pages/MockRoomPage.tsx";
 import { TeamRoundPage } from "./pages/TeamRoundPage.tsx";
 import { JoinPage } from "./pages/JoinPage.tsx";
 import { LeaguePage } from "./pages/LeaguePage.tsx";
@@ -47,6 +50,9 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/l/:id/matchup/:round/:homeId/:awayId" element={authed(<MatchupPage />)} />
           <Route path="/l/:id/ladder" element={authed(<LadderPage />)} />
           <Route path="/l/:id/settings" element={authed(<LeagueSettingsPage />)} />
+          <Route path="/mock" element={authed(<MockDraftsPage />)} />
+          <Route path="/mock/play" element={authed(<MockRoomPage />)} />
+          <Route path="/mock/:id" element={authed(<MockResultPage />)} />
           <Route path="/profile" element={authed(<ProfilePage />)} />
           <Route path="/admin/players" element={authed(<AdminPlayersPage />)} />
           <Route path="/admin/scoring" element={authed(<AdminScoringPage />)} />

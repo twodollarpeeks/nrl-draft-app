@@ -100,3 +100,40 @@ export function chooseAutopick(input: {
     input.isAvailable(id) && checkDraftable(input.template, input.roster, input.positionsOf(id)).ok;
   return input.queue.find(fits) ?? input.ranked.find(fits) ?? null;
 }
+
+/**
+ * A CPU team's pick in a mock draft: one of the best few available players it
+ * can draft, chosen at random but leaning towards the higher-ranked ones and
+ * towards players who fill a starting spot it still needs. So CPUs draft
+ * sensibly without every mock playing out the same way.
+ */
+export function chooseCpuPick(input: {
+  template: RosterTemplate;
+  roster: ReadonlyArray<readonly NrlPosition[]>;
+  ranked: readonly number[]; // best first
+  isAvailable: (playerId: number) => boolean;
+  positionsOf: (playerId: number) => readonly NrlPosition[];
+  /** Returns [0, 1); injectable for tests. */
+  random?: () => number;
+  /** How many of the best available players to choose between. */
+  shortlist?: number;
+}): number | null {
+  const { template, roster, positionsOf } = input;
+  const random = input.random ?? Math.random;
+  const filled = startersFillable(template, roster);
+  const options: Array<{ id: number; weight: number }> = [];
+  for (const id of input.ranked) {
+    if (options.length >= (input.shortlist ?? 5)) break;
+    if (!input.isAvailable(id) || !checkDraftable(template, roster, positionsOf(id)).ok) continue;
+    const fillsSpot = startersFillable(template, [...roster, positionsOf(id)]) > filled;
+    // Each step down the shortlist is a bit less likely; needed positions get a boost.
+    options.push({ id, weight: 0.65 ** options.length * (fillsSpot ? 2 : 1) });
+  }
+  if (options.length === 0) return null;
+  let r = random() * options.reduce((sum, o) => sum + o.weight, 0);
+  for (const o of options) {
+    r -= o.weight;
+    if (r < 0) return o.id;
+  }
+  return options[options.length - 1]!.id;
+}

@@ -7,11 +7,13 @@ export function ClockBar({
   myTeamId,
   picksUntilMine,
   connection,
+  pausedText = "Paused by the commissioner",
 }: {
   state: DraftState;
   myTeamId: string;
   picksUntilMine: number | null;
   connection: Connection;
+  pausedText?: string;
 }) {
   const seconds = useCountdown(state);
   const onClock = state.order.find((t) => t.id === state.onClockTeamId);
@@ -36,7 +38,7 @@ export function ClockBar({
               </div>
               <div className="text-xs text-muted">
                 {state.status === "paused"
-                  ? "Paused by the commissioner"
+                  ? pausedText
                   : autopilot
                     ? "On autopick"
                     : picksUntilMine === null

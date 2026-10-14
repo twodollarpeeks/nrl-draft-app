@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { MIN_TEAMS, type DraftPlayer, type DraftState, type LeagueDetail, type NrlPosition } from "@nrl/shared";
 import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
 import { ClockBar } from "../components/draft/ClockBar.tsx";
+import { DraftLayout, useTurnAlert } from "../components/draft/DraftLayout.tsx";
 import { BoardPanel, QueuePanel, TeamPanel, picksUntil } from "../components/draft/Panels.tsx";
 import { PlayerList } from "../components/draft/PlayerList.tsx";
 import { AppShell } from "../components/Layout.tsx";
 import { Button, Card, ErrorText, Spinner } from "../components/ui.tsx";
 import { useDraftAction, useDraftPlayers, useDraftState, useQueue } from "../lib/draft.ts";
 import { useLeague } from "../lib/queries.ts";
-
-type Tab = "players" | "queue" | "board" | "team";
 
 export function DraftRoomPage() {
   const { id = "" } = useParams();
@@ -55,13 +54,8 @@ function Room({
   const leagueId = league.id;
   const myTeamId = league.myTeamId;
   const template = league.settings.roster;
-  const [tab, setTab] = useState<Tab>("players");
   const [commishMode, setCommishMode] = useState(false);
   const { queue: savedQueue, update: updateQueue, error: queueError } = useQueue(leagueId);
-  const wide = useMediaQuery("(min-width: 1024px)");
-  const xl = useMediaQuery("(min-width: 1280px)");
-  // Desktop below xl has room for one of players/board beside the sidebar.
-  const [deskTab, setDeskTab] = useState<"players" | "board">("players");
 
   const pick = useDraftAction<{ pickNo: number; playerId: number }>(leagueId, "pick", (v) => v);
   const autopilot = useDraftAction<boolean>(leagueId, "autopilot", (on) => ({ on }));
@@ -93,13 +87,6 @@ function Room({
     updateQueue((cur) => (cur.includes(pid) ? cur.filter((q) => q !== pid) : [...cur, pid]));
   const actionError = pick.error ?? autopilot.error ?? start.error ?? pause.error ?? resume.error ?? undo.error ?? queueError;
 
-  const tabs: Array<[Tab, string]> = [
-    ["players", "Players"],
-    ["queue", `Queue${queue.length ? ` (${queue.length})` : ""}`],
-    ["board", "Board"],
-    ["team", "My team"],
-  ];
-
   const playerList = (
     <PlayerList
       players={players}
@@ -114,147 +101,68 @@ function Room({
       onToggleQueue={toggleQueue}
     />
   );
-  const queuePanel = <QueuePanel queue={queue} players={byId} takenBy={takenBy} onChange={(ids) => updateQueue(() => ids)} />;
-  const teamPanel = <TeamPanel state={state} players={byId} template={template} teamId={myTeamId} />;
-  const board = <BoardPanel state={state} players={byId} myTeamId={myTeamId} fill={wide} />;
-  const preDraft = state.status === "pending" && (
-    <PreDraft league={league} onStart={() => start.mutate()} starting={start.isPending} />
+  const stepAway = !onAutopilot && state.status === "live" && (
+    <button className="self-start text-xs text-muted underline" onClick={() => autopilot.mutate(true)}>
+      Step away: autopick for me
+    </button>
   );
-  const column = "flex min-h-0 flex-col gap-4 overflow-y-auto";
 
   return (
-    // Desktop: the room fills the window and each column scrolls on its own.
-    <div className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
-      <header className="sticky top-0 z-20 shrink-0 bg-bg">
-        <div className="flex items-center gap-3 border-b border-border px-4 py-2 lg:px-6">
-          <Link to={`/l/${leagueId}`} className="-ml-2 rounded-lg px-2 py-1 text-muted hover:text-text" aria-label="Back to league">
-            ←
-          </Link>
-          <h1 className="truncate font-semibold">{league.name} draft</h1>
-        </div>
-        <ClockBar state={state} myTeamId={myTeamId} picksUntilMine={until} connection={connection} />
-        {onAutopilot && state.status !== "complete" && (
+    <DraftLayout
+      title={`${league.name} draft`}
+      back={`/l/${leagueId}`}
+      backLabel="Back to league"
+      clock={<ClockBar state={state} myTeamId={myTeamId} picksUntilMine={until} connection={connection} />}
+      banner={
+        onAutopilot &&
+        state.status !== "complete" && (
           <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-2 px-4 py-2 text-sm lg:px-6">
             <span>You're on autopick: your queue, then best available.</span>
             <Button variant="secondary" className="min-h-9" onClick={() => autopilot.mutate(false)} disabled={autopilot.isPending}>
               I'm back
             </Button>
           </div>
-        )}
-        <nav className={`flex border-b border-border ${wide ? "hidden" : ""}`} role="tablist">
-          {tabs.map(([t, label]) => (
-            <button
-              key={t}
-              role="tab"
-              aria-selected={tab === t}
-              onClick={() => setTab(t)}
-              className={`min-h-11 flex-1 text-sm font-medium ${tab === t ? "border-b-2 border-accent text-text" : "text-muted"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-      </header>
-
-      <main className="flex flex-1 flex-col gap-4 px-4 py-4 lg:min-h-0 lg:px-6">
-        {socketError && <ErrorText error={socketError} />}
-        <ErrorText error={actionError} />
-
-        {!wide && preDraft}
-        {state.status === "complete" && (
-          <Card className="flex shrink-0 items-center justify-between gap-3">
-            <div>
-              <div className="font-semibold">The draft is done 🏉</div>
-              <div className="text-sm text-muted">Every team has its squad. Set your lineup before round 1.</div>
-            </div>
-            <Link to={`/l/${leagueId}`} className="text-sm font-medium text-accent">
-              League →
-            </Link>
-          </Card>
-        )}
-
-        {league.isCommissioner && state.status !== "pending" && (
-          <CommissionerBar
-            state={state}
-            commishMode={commishMode}
-            setCommishMode={setCommishMode}
-            onPause={() => pause.mutate()}
-            onResume={() => resume.mutate()}
-            onUndo={() => {
-              if (confirm("Undo the most recent pick?")) undo.mutate();
-            }}
-          />
-        )}
-
-        {/* Phones: tabs. Desktop: players | board | queue + team, or players/board as tabs when narrower. */}
-        {wide ? (
-          <div
-            className={`grid min-h-0 flex-1 gap-6 ${
-              xl ? "grid-cols-[360px_minmax(0,1fr)_320px]" : "grid-cols-[minmax(0,1fr)_320px]"
-            }`}
-          >
-            {xl ? (
-              <>
-                <section className={column} aria-label="Players">
-                  {playerList}
-                </section>
-                {/* Before the draft there's no board yet: the start card takes its place. */}
-                <section className="flex min-h-0 flex-col" aria-label="Draft board">
-                  {preDraft ? <div className="max-w-xl">{preDraft}</div> : board}
-                </section>
-              </>
-            ) : (
-              <section className="flex min-h-0 flex-col gap-3">
-                <div className="flex shrink-0 gap-2" role="tablist">
-                  {(["players", "board"] as const).map((t) => (
-                    <button
-                      key={t}
-                      role="tab"
-                      aria-selected={deskTab === t}
-                      onClick={() => setDeskTab(t)}
-                      className={`min-h-9 rounded-full px-4 text-sm font-medium ${deskTab === t ? "bg-accent text-bg" : "bg-surface-2 text-muted"}`}
-                    >
-                      {t === "players" ? "Players" : "Board"}
-                    </button>
-                  ))}
-                </div>
-                {deskTab === "players" ? <div className={column}>{playerList}</div> : board}
-              </section>
-            )}
-            <aside className={`${column} gap-6`}>
-              {!xl && preDraft}
-              <section>
-                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Queue</h2>
-                {queuePanel}
-              </section>
-              <section>
-                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">My team</h2>
-                {teamPanel}
-              </section>
-              {!onAutopilot && state.status === "live" && (
-                <button className="self-start text-xs text-muted underline" onClick={() => autopilot.mutate(true)}>
-                  Step away: autopick for me
-                </button>
-              )}
-            </aside>
-          </div>
-        ) : (
-          <>
-            <div>
-              {tab === "players" && playerList}
-              {tab === "queue" && queuePanel}
-              {tab === "board" && board}
-              {tab === "team" && teamPanel}
-            </div>
-            {!onAutopilot && state.status === "live" && (
-              <button className="self-start text-xs text-muted underline" onClick={() => autopilot.mutate(true)}>
-                Step away: autopick for me
-              </button>
-            )}
-          </>
-        )}
-      </main>
-    </div>
+        )
+      }
+      notices={
+        <>
+          {socketError && <ErrorText error={socketError} />}
+          <ErrorText error={actionError} />
+          {state.status === "complete" && (
+            <Card className="flex shrink-0 items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold">The draft is done 🏉</div>
+                <div className="text-sm text-muted">Every team has its squad. Set your lineup before round 1.</div>
+              </div>
+              <Link to={`/l/${leagueId}`} className="text-sm font-medium text-accent">
+                League →
+              </Link>
+            </Card>
+          )}
+          {league.isCommissioner && state.status !== "pending" && (
+            <CommissionerBar
+              state={state}
+              commishMode={commishMode}
+              setCommishMode={setCommishMode}
+              onPause={() => pause.mutate()}
+              onResume={() => resume.mutate()}
+              onUndo={() => {
+                if (confirm("Undo the most recent pick?")) undo.mutate();
+              }}
+            />
+          )}
+        </>
+      }
+      preDraft={
+        state.status === "pending" && <PreDraft league={league} onStart={() => start.mutate()} starting={start.isPending} />
+      }
+      playerList={playerList}
+      board={(fill) => <BoardPanel state={state} players={byId} myTeamId={myTeamId} fill={fill} />}
+      queuePanel={<QueuePanel queue={queue} players={byId} takenBy={takenBy} onChange={(ids) => updateQueue(() => ids)} />}
+      queueCount={queue.length}
+      teamPanel={<TeamPanel state={state} players={byId} template={template} teamId={myTeamId} />}
+      footer={stepAway}
+    />
   );
 }
 
@@ -334,39 +242,4 @@ function CommissionerBar({
       )}
     </div>
   );
-}
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
-  useEffect(() => {
-    const mql = window.matchMedia(query);
-    const onChange = () => setMatches(mql.matches);
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, [query]);
-  return matches;
-}
-
-/** Buzz and flash the tab title when it becomes your turn. */
-function useTurnAlert(myTurn: boolean) {
-  const was = useRef(myTurn);
-  useEffect(() => {
-    if (myTurn && !was.current) {
-      navigator.vibrate?.([200, 100, 200]);
-      const original = document.title;
-      let on = true;
-      const id = setInterval(() => {
-        document.title = on ? "⏰ Your pick!" : original;
-        on = !on;
-      }, 1000);
-      const stop = () => {
-        clearInterval(id);
-        document.title = original;
-      };
-      window.addEventListener("focus", stop, { once: true });
-      was.current = myTurn;
-      return stop;
-    }
-    was.current = myTurn;
-  }, [myTurn]);
 }

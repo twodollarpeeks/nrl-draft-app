@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LeagueSettings } from "./leagueSettings.ts";
+import { LeagueSettings, MAX_TEAMS, MIN_TEAMS, type RosterTemplate, type ScoringRules } from "./leagueSettings.ts";
 import { NrlPosition } from "./positions.ts";
 import type { Lineup } from "./lineup.ts";
 import type { ScoreState } from "./matchState.ts";
@@ -317,4 +317,61 @@ export interface RoundView {
   matchups: MatchupView[];
   /** Every team's score this round (total-points leagues rank on these). */
   scores: MatchupSide[];
+}
+
+// ---- Mock drafts ----------------------------------------------------------
+// Solo practice drafts against CPU teams, separate from leagues. They run in
+// the browser; finished ones are saved to the user's history.
+
+/** The pool a mock drafts from: the site's default squad and scoring, ranked on the latest season. */
+export interface MockPool {
+  /** Season the rankings come from (null when no match data is loaded). */
+  season: number | null;
+  roster: RosterTemplate;
+  scoring: ScoringRules;
+  players: DraftPlayer[];
+}
+
+export const MockDraftInput = z.object({
+  teamCount: z.number().int().min(MIN_TEAMS).max(MAX_TEAMS),
+  /** Your round-1 position, 1-based. */
+  slot: z.number().int().min(1).max(MAX_TEAMS),
+  /** 0 = no clock. */
+  pickSeconds: z.number().int().min(0).max(600),
+  teamNames: z.array(z.string().trim().min(1).max(40)),
+  /** Player ids in pick order: pick 1 first. */
+  picks: z.array(z.number().int()),
+});
+export type MockDraftInput = z.infer<typeof MockDraftInput>;
+
+/** A pick as it was made, kept with the player's details at the time. */
+export interface MockPickView {
+  pickNo: number;
+  playerId: number;
+  name: string;
+  positions: NrlPosition[];
+  club: string | null;
+  avgPoints: number;
+}
+
+export interface MockDraftSummary {
+  id: string;
+  createdAt: string;
+  season: number;
+  teamCount: number;
+  slot: number;
+  /** Your first few picks, for the history list. */
+  firstPicks: string[];
+}
+
+export interface MockDraftDetail {
+  id: string;
+  createdAt: string;
+  season: number;
+  teamCount: number;
+  slot: number;
+  pickSeconds: number;
+  roster: RosterTemplate;
+  teamNames: string[];
+  picks: MockPickView[];
 }

@@ -167,6 +167,7 @@ model User {
   teams           Team[]
   leaguesRun      League[]   @relation("Commissioner")
   auditLogEntries AuditLog[]
+  mockDrafts      MockDraft[]
 }
 
 model Session {
@@ -435,4 +436,25 @@ model Matchup {
 
   @@unique([leagueId, round, homeTeamId])
   @@index([leagueId, round])
+}
+
+/// A finished solo mock draft (you against CPU teams), kept as history.
+/// Separate from leagues; picks are stored with the player details at the time.
+model MockDraft {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Season whose stats ranked the players.
+  season      Int
+  teamCount   Int
+  /// Your round-1 position, 1-based.
+  slot        Int
+  pickSeconds Int
+  /// { roster, teamNames }
+  settings    Json
+  /// MockPickView[] in pick order.
+  picks       Json
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

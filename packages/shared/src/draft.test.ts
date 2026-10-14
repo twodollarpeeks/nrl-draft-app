@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   checkDraftable,
   chooseAutopick,
+  chooseCpuPick,
   picksForTeam,
   roundOf,
   snakeIndex,
@@ -114,5 +115,47 @@ describe("chooseAutopick", () => {
 
   it("returns null when nobody fits", () => {
     expect(chooseAutopick({ ...base, isAvailable: () => false })).toBeNull();
+  });
+});
+
+describe("chooseCpuPick", () => {
+  const positions: Record<number, NrlPosition[]> = { 1: HB, 2: FWD, 3: OB, 4: OB, 5: FWD, 6: HB, 7: FWD };
+  const base = {
+    template: T,
+    roster: [] as NrlPosition[][],
+    ranked: [2, 3, 1, 4, 5, 6, 7],
+    isAvailable: () => true,
+    positionsOf: (id: number) => positions[id] ?? [],
+  };
+
+  it("picks from the best few available, favouring higher ranks", () => {
+    expect(chooseCpuPick({ ...base, random: () => 0 })).toBe(2);
+    expect(chooseCpuPick({ ...base, random: () => 0.999 })).toBe(5); // 5th best is the last option
+    const seen = new Set<number>();
+    for (let i = 0; i < 200; i++) seen.add(chooseCpuPick(base)!);
+    expect([...seen].every((id) => [2, 3, 1, 4, 5].includes(id))).toBe(true);
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it("leans towards players who fill a starting spot it still needs", () => {
+    // Forwards are all filled (3 + a flex), so a FWD fills nothing; the HB fills HF/HK.
+    const roster = [FWD, FWD, FWD, FWD, OB, OB, OB];
+    const count = { hb: 0, fwd: 0 };
+    let seed = 1;
+    const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let i = 0; i < 1000; i++) {
+      const pick = chooseCpuPick({ ...base, roster, ranked: [7, 1], random })!;
+      if (pick === 1) count.hb++;
+      else count.fwd++;
+    }
+    // Ranked second, but weighted 2x for need: 2 x 0.65 = 1.3 vs 1.
+    expect(count.hb).toBeGreaterThan(count.fwd);
+  });
+
+  it("never takes a player the team can't fit, and returns null when nobody fits", () => {
+    const roster = [HB, FWD, FWD, FWD, OB, OB, FWD, FWD, FWD, FWD, FWD, FWD, FWD];
+    // Only an OB fits the last pick (3 and 4 are the OBs).
+    for (let i = 0; i < 50; i++) expect([3, 4]).toContain(chooseCpuPick({ ...base, roster }));
+    expect(chooseCpuPick({ ...base, isAvailable: () => false })).toBeNull();
   });
 });

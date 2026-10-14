@@ -12,12 +12,20 @@ export function LeaguesPage() {
     <AppShell width="wide">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Your leagues</h1>
-        <Link
-          to="/leagues/new"
-          className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-bg hover:brightness-110"
-        >
-          + New league
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            to="/mock"
+            className="inline-flex min-h-11 items-center rounded-xl bg-surface-2 px-4 text-sm font-semibold hover:bg-border"
+          >
+            Mock draft
+          </Link>
+          <Link
+            to="/leagues/new"
+            className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-bg hover:brightness-110"
+          >
+            + New league
+          </Link>
+        </div>
       </div>
 
       {isPending && <Spinner />}

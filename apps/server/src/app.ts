@@ -11,6 +11,7 @@ import type { Env } from "./env.ts";
 import { registerErrorHandler } from "./errors.ts";
 import { createGuards, parseAdminEmails } from "./guards.ts";
 import { registerLeagueRoutes } from "./leagues/routes.ts";
+import { registerMockRoutes } from "./mock/routes.ts";
 import type { LeagueServiceOptions } from "./leagues/service.ts";
 import { registerSeasonRoutes } from "./season/routes.ts";
 import { SeasonService } from "./season/service.ts";
@@ -58,6 +59,7 @@ export async function buildApp({ env, db, auth, getUser, draft, leagues, season,
       onDraftAtChange: (leagueId, at) => engine.scheduleStart(leagueId, at),
     });
     registerAdminRoutes(app, db, guards);
+    registerMockRoutes(app, db, guards);
     registerDraftRoutes(app, engine, guards);
     registerSeasonRoutes(app, new SeasonService(db, season ?? {}), guards);
     app.decorate("draftEngine", engine);

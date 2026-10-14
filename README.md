@@ -11,6 +11,8 @@ finals at the end.
 - **Live draft room:** server-run clock, pre-draft queue, autopick (queue,
   then best available that fits), autopilot for missed picks, commissioner
   pause/undo, a colour-coded board, and it survives refreshes and reconnects.
+- **Mock drafts:** practise any time against CPU teams (pick your slot, clock
+  and CPU speed); finished mocks are saved to your history.
 - **Season:** lineups lock per player at kickoff; bye, not named and reserve
   warnings; ordered emergencies; live scores (final after a 24-hour stats
   review); side-by-side matchups; ladder and finals.
