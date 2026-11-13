@@ -16,6 +16,7 @@ export function LeagueTabs({
   const tabs: Array<[string, string, boolean]> = [
     [`/l/${leagueId}`, "Home", true],
     [`/l/${leagueId}/team/${myTeamId}`, "My team", false],
+    [`/l/${leagueId}/players`, "Players", false],
     [`/l/${leagueId}/matchups`, "Matchups", false],
     [`/l/${leagueId}/ladder`, "Ladder", false],
   ];

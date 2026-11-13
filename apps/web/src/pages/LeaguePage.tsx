@@ -4,6 +4,7 @@ import { seasonRounds, squadSize, type LeagueDetail } from "@nrl/shared";
 import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
 import { formatPoints, useRound, useSeason } from "../lib/season.ts";
 import { MatchupCard } from "./MatchupsPage.tsx";
+import { Activity } from "./PlayersPage.tsx";
 import { scoringSummary } from "../components/ScoringEditor.tsx";
 import { AppShell } from "../components/Layout.tsx";
 import { Avatar, Button, Card, ErrorText, SectionTitle, Spinner, inputClass } from "../components/ui.tsx";
@@ -37,6 +38,7 @@ export function LeaguePage() {
 
         <div className="flex flex-col gap-4">
           {inSeason && <LadderSnapshot league={league} />}
+          {inSeason && <Activity leagueId={league.id} limit={6} />}
           <Card>
             <SectionTitle>
               Teams · {league.teamsJoined}/{league.teamCount}

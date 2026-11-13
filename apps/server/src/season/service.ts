@@ -71,7 +71,7 @@ interface PlayerInfo {
   club: { id: number; key: string; nickName: string } | null;
 }
 
-interface TeamInfo {
+export interface TeamInfo {
   id: string;
   name: string;
   ownerId: string;
@@ -81,7 +81,7 @@ interface TeamInfo {
 }
 
 /** Everything needed to score a league's season, loaded once per request. */
-interface SeasonContext {
+export interface SeasonContext {
   league: { id: string; season: number; status: string; firstRound: number; commissionerId: string };
   settings: LeagueSettings;
   rounds: Map<number, RoundInfo>;
@@ -97,8 +97,12 @@ interface SeasonContext {
   range: { firstRound: number; lastRegularRound: number; grandFinalRound: number | null; lastRound: number };
 }
 
+type Db = PrismaClient | Prisma.TransactionClient;
+
 export class SeasonService {
   private readonly now: () => Date;
+  /** Runs before a league is read (to settle waivers and trades that are due). */
+  beforeLoad: ((leagueId: string) => Promise<void>) | null = null;
 
   constructor(
     private readonly db: PrismaClient,
@@ -110,12 +114,20 @@ export class SeasonService {
   // ---- Loading -------------------------------------------------------------
 
   private async load(user: SessionUser, leagueId: string): Promise<SeasonContext & { myTeamId: string }> {
-    const league = await this.db.league.findUnique({
+    await this.beforeLoad?.(leagueId);
+    const ctx = await this.context(leagueId);
+    const mine = ctx.teams.find((t) => t.ownerId === user.id);
+    if (!mine) throw notFound("League");
+    return { ...ctx, myTeamId: mine.id };
+  }
+
+  /** A league's season, read through `db` (pass a transaction to read inside it). */
+  async context(leagueId: string, db: Db = this.db): Promise<SeasonContext> {
+    const league = await db.league.findUnique({
       where: { id: leagueId },
       include: { teams: { include: { owner: true }, orderBy: { createdAt: "asc" } } },
     });
-    const mine = league?.teams.find((t) => t.ownerId === user.id);
-    if (!league || !mine) throw notFound("League");
+    if (!league) throw notFound("League");
     if (league.status !== "inSeason" && league.status !== "complete") {
       throw conflict("season_not_started", "The season starts once the draft is done");
     }
@@ -124,18 +136,18 @@ export class SeasonService {
     const firstRound = league.firstRound ?? 1;
 
     const [rounds, roster, picks, lineups, matchups, named] = await Promise.all([
-      this.db.round.findMany({
+      db.round.findMany({
         where: { season: league.season, number: { gte: firstRound, lte: settings.seasonEndRound } },
         include: { matches: { include: { homeClub: true, awayClub: true } } },
       }),
-      this.db.rosterEntry.findMany({
+      db.rosterEntry.findMany({
         where: { leagueId, releasedAt: null },
         include: { player: { include: { club: true } } },
       }),
-      this.db.draftPick.findMany({ where: { draft: { leagueId } }, select: { playerId: true, pickNo: true } }),
-      this.db.lineup.findMany({ where: { leagueId } }),
-      this.db.matchup.findMany({ where: { leagueId } }),
-      this.db.appearance.groupBy({
+      db.draftPick.findMany({ where: { draft: { leagueId } }, select: { playerId: true, pickNo: true } }),
+      db.lineup.findMany({ where: { leagueId } }),
+      db.matchup.findMany({ where: { leagueId } }),
+      db.appearance.groupBy({
         by: ["matchId"],
         where: { match: { round: { season: league.season, number: { gte: firstRound, lte: settings.seasonEndRound } } } },
       }),
@@ -171,23 +183,30 @@ export class SeasonService {
 
     const pickNo = new Map(picks.map((p) => [p.playerId, p.pickNo]));
     const players = new Map<number, PlayerInfo>();
-    const squads = new Map<string, SquadPlayer[]>();
-    for (const e of roster) {
-      const p = e.player;
-      const positions = effectivePositions(p);
+    const addPlayer = (p: (typeof roster)[number]["player"]) =>
       players.set(p.id, {
         id: p.id,
         name: `${p.firstName} ${p.lastName}`,
-        positions,
+        positions: effectivePositions(p),
         club: p.club ? { id: p.club.id, key: p.club.key, nickName: p.club.nickName } : null,
       });
+    const squads = new Map<string, SquadPlayer[]>();
+    for (const e of roster) {
+      addPlayer(e.player);
       const list = squads.get(e.teamId) ?? [];
-      list.push({ id: p.id, positions });
+      list.push({ id: e.player.id, positions: players.get(e.player.id)!.positions });
       squads.set(e.teamId, list);
+    }
+    // Players in earlier rounds' lineups who've since left the team still score there.
+    const departed = [...new Set(lineups.flatMap((l) => lineupIds(l.starters as Lineup["starters"], l.bench)))].filter(
+      (id) => !players.has(id),
+    );
+    if (departed.length) {
+      for (const p of await db.player.findMany({ where: { id: { in: departed } }, include: { club: true } })) addPlayer(p);
     }
     for (const list of squads.values()) list.sort((a, b) => (pickNo.get(a.id) ?? 1e9) - (pickNo.get(b.id) ?? 1e9));
 
-    const apps = await this.db.appearance.findMany({
+    const apps = await db.appearance.findMany({
       where: { playerId: { in: [...players.keys()] }, match: { round: { season: league.season } } },
       select: {
         playerId: true, matchId: true, clubId: true, jersey: true, minutes: true, stats: true,
@@ -212,7 +231,6 @@ export class SeasonService {
     }
 
     return {
-      myTeamId: mine.id,
       league: { id: league.id, season: league.season, status: league.status, firstRound, commissionerId: league.commissionerId },
       settings,
       rounds: roundMap,
@@ -299,27 +317,78 @@ export class SeasonService {
     return { result, view };
   }
 
+  /**
+   * A team's squad in a round. Once a round has started, its saved lineup is
+   * the record of who was in the squad (a squad change saves one first), so
+   * players moving later never rewrite past rounds. Otherwise: the squad now.
+   */
+  squadFor(ctx: SeasonContext, team: TeamInfo, roundNo: number): SquadPlayer[] {
+    const exact = ctx.lineups.get(team.id)?.get(roundNo);
+    if (!exact || !this.started(ctx, roundNo)) return team.squad;
+    return lineupIds(exact.starters, exact.bench).flatMap((id) => {
+      const p = ctx.players.get(id);
+      return p ? [{ id, positions: p.positions }] : [];
+    });
+  }
+
+  /** Has any game of the round kicked off? */
+  started(ctx: SeasonContext, roundNo: number): boolean {
+    const first = ctx.rounds.get(roundNo)?.firstKickoff;
+    return !!first && first <= this.now();
+  }
+
+  /** The round squad changes affect now: the first that isn't over (null once the season is). */
+  currentRound(ctx: SeasonContext): number | null {
+    for (let n = ctx.range.firstRound; n <= ctx.range.lastRound; n++) {
+      if (ctx.rounds.get(n)?.status !== "complete") return n;
+    }
+    return null;
+  }
+
+  /** Has the player's game in the current round started? Then they can't move until it's over. */
+  isLocked(ctx: SeasonContext, playerId: number): boolean {
+    const round = this.currentRound(ctx);
+    if (round === null || !this.started(ctx, round) || !ctx.players.has(playerId)) return false;
+    return this.playerRound(ctx, playerId, round).view.locked;
+  }
+
   /** The lineup a team uses in a round: saved for that round, else the latest earlier one, else automatic. */
-  private lineupFor(
+  lineupFor(
     ctx: SeasonContext,
     team: TeamInfo,
     roundNo: number,
   ): { lineup: Lineup; source: "saved" | "carried" | "auto" } {
+    const squad = this.squadFor(ctx, team, roundNo);
     const saved = ctx.lineups.get(team.id);
     const exact = saved?.get(roundNo);
-    if (exact) return { lineup: reconcileLineup(ctx.settings.roster, team.squad, exact), source: "saved" };
+    if (exact) return { lineup: reconcileLineup(ctx.settings.roster, squad, exact), source: "saved" };
     const earlier = saved ? [...saved.keys()].filter((r) => r < roundNo).sort((a, b) => b - a)[0] : undefined;
     if (earlier !== undefined) {
-      return { lineup: reconcileLineup(ctx.settings.roster, team.squad, saved!.get(earlier)!), source: "carried" };
+      return { lineup: reconcileLineup(ctx.settings.roster, squad, saved!.get(earlier)!), source: "carried" };
     }
-    return { lineup: autoLineup(ctx.settings.roster, team.squad), source: "auto" };
+    return { lineup: autoLineup(ctx.settings.roster, squad), source: "auto" };
+  }
+
+  /**
+   * Before a team's squad changes: the lineup it used in every round that has
+   * started but has none saved, so those rounds keep the squad they had.
+   */
+  lineupsToFreeze(ctx: SeasonContext, teamId: string): Array<{ round: number; lineup: Lineup }> {
+    const team = ctx.teams.find((t) => t.id === teamId);
+    if (!team) return [];
+    const out: Array<{ round: number; lineup: Lineup }> = [];
+    for (let n = ctx.range.firstRound; n <= ctx.range.lastRound; n++) {
+      if (!this.started(ctx, n)) break;
+      if (!ctx.lineups.get(teamId)?.has(n)) out.push({ round: n, lineup: this.lineupFor(ctx, team, n).lineup });
+    }
+    return out;
   }
 
   private teamScore(ctx: SeasonContext, team: TeamInfo, roundNo: number) {
     const { lineup, source } = this.lineupFor(ctx, team, roundNo);
     const results = new Map<number, PlayerRoundResult>();
     const views: PlayerRoundView[] = [];
-    for (const p of team.squad) {
+    for (const p of this.squadFor(ctx, team, roundNo)) {
       const { result, view } = this.playerRound(ctx, p.id, roundNo);
       results.set(p.id, result);
       views.push(view);
@@ -363,7 +432,7 @@ export class SeasonService {
     if (team.ownerId !== user.id) throw forbidden("That's not your team");
     if (ctx.rounds.get(roundNo)?.status === "complete") throw conflict("round_over", "This round is over");
 
-    const errors = lineupErrors(ctx.settings.roster, team.squad, next);
+    const errors = lineupErrors(ctx.settings.roster, this.squadFor(ctx, team, roundNo), next);
     if (errors.length) throw new AppError(400, "bad_lineup", errors.join(". "));
     const { lineup: current } = this.lineupFor(ctx, team, roundNo);
     const moved = movedLockedPlayers(current, next, (id) => this.playerRound(ctx, id, roundNo).view.locked);
@@ -539,6 +608,11 @@ export class SeasonService {
       throw new AppError(404, "not_found", `Round ${roundNo} isn't part of this league's season`);
     }
   }
+}
+
+/** Every player id in a lineup: starters, then bench. */
+function lineupIds(starters: Lineup["starters"], bench: readonly number[]): number[] {
+  return [...Object.values(starters).flat().filter((id): id is number => id !== null), ...bench];
 }
 
 function regularMatchup(round: number, home: MatchupSide, away: MatchupSide): MatchupView {

@@ -375,3 +375,70 @@ export interface MockDraftDetail {
   teamNames: string[];
   picks: MockPickView[];
 }
+
+// ---- Free agency and waivers ------------------------------------------------
+
+/** "free": pick up now. "waivers": claim it; claims settle Wednesday 6am. */
+export type PlayerAvailability = "owned" | "free" | "waivers";
+
+export interface LeaguePlayer {
+  id: number;
+  name: string;
+  club: { key: string; nickName: string } | null;
+  positions: NrlPosition[];
+  ownerTeamId: string | null;
+  availability: PlayerAvailability;
+  /** Their game this round has started: they can't be added or dropped until the round is over. */
+  locked: boolean;
+  /** This season's average points per game under the league's scoring. */
+  seasonAvg: number | null;
+  seasonGames: number;
+  /** Last season's, while this season is young (null when there's no earlier season). */
+  prevAvg: number | null;
+  prevGames: number;
+}
+
+export interface ClaimView {
+  id: string;
+  rank: number;
+  player: { id: number; name: string; positions: NrlPosition[] };
+  drop: { id: number; name: string; positions: NrlPosition[] } | null;
+}
+
+export interface PlayersView {
+  leagueId: string;
+  myTeamId: string;
+  isCommissioner: boolean;
+  season: number;
+  /** The season `prevAvg` comes from, if any. */
+  prevSeason: number | null;
+  squadMax: number;
+  teams: Array<{ id: string; name: string }>;
+  waivers: {
+    lastClear: string;
+    nextClear: string;
+    /** Team ids, first in line first. */
+    order: string[];
+  };
+  players: LeaguePlayer[];
+  /** Your pending claims, in your order. */
+  claims: ClaimView[];
+}
+
+export const AddPlayerInput = z.object({
+  teamId: z.string(),
+  playerId: z.number().int(),
+  dropPlayerId: z.number().int().nullable().optional(),
+});
+export type AddPlayerInput = z.infer<typeof AddPlayerInput>;
+
+export const DropPlayerInput = z.object({ teamId: z.string(), playerId: z.number().int() });
+
+export const ClaimOrderInput = z.object({ teamId: z.string(), claimIds: z.array(z.string()) });
+
+export interface ActivityItem {
+  id: string;
+  at: string;
+  kind: "add" | "drop" | "waiver" | "trade";
+  text: string;
+}

@@ -243,6 +243,9 @@ model League {
   // First fantasy round: the first NRL round not yet started when the draft
   // finished (1 for a replay of a finished season). Set at draft completion.
   firstRound        Int?
+  // Rolling waiver priority, first in line first: team ids. Starts as the
+  // reverse of the draft order; a team that wins a claim goes to the back.
+  waiverOrder       String[]  @default([])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -264,6 +267,10 @@ model Team {
   name      String
   createdAt DateTime @default(now())
 
+  // Set by the commissioner to hand the team to a new manager: whoever opens
+  // the link takes the team over.
+  handoverCode String?        @unique
+
   league     League           @relation(fields: [leagueId], references: [id], onDelete: Cascade)
   owner      User             @relation(fields: [ownerId], references: [id])
   draftPicks DraftPick[]
@@ -272,6 +279,10 @@ model Team {
   lineups    Lineup[]
   homeGames  Matchup[]        @relation("HomeTeam")
   awayGames  Matchup[]        @relation("AwayTeam")
+  claims     WaiverClaim[]
+  tradesProposed Trade[]      @relation("TradeProposer")
+  tradesReceived Trade[]      @relation("TradeReceiver")
+  tradeVotes     TradeVote[]
 
   @@unique([leagueId, ownerId])
   @@unique([leagueId, name])
@@ -373,7 +384,7 @@ model RosterEntry {
   leagueId    String
   teamId      String
   playerId    Int
-  acquiredVia String // "draft" (later: "waiver", "trade", "freeAgent")
+  acquiredVia String // "draft", "waiver", "freeAgent", "trade"
   acquiredAt  DateTime  @default(now())
   releasedAt  DateTime?
 
@@ -457,4 +468,71 @@ model MockDraft {
   createdAt   DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Waivers and trades
+// ---------------------------------------------------------------------------
+
+// A claim on a player on waivers, settled when waivers clear (Wednesday 6am
+// Sydney time). A team ranks its own claims; teams take turns in waiver order.
+model WaiverClaim {
+  id           String    @id @default(cuid())
+  leagueId     String
+  teamId       String
+  playerId     Int
+  // Who to let go to make room (optional while the squad has space).
+  dropPlayerId Int?
+  // The team's own order for its claims, 1 first.
+  rank         Int
+  // "pending" -> "won" | "lost" (someone ahead got them) | "failed" (no longer valid) | "cancelled"
+  status       String    @default("pending")
+  note         String?
+  createdAt    DateTime  @default(now())
+  processedAt  DateTime?
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([leagueId, status])
+}
+
+// A trade between two teams. Accepted trades sit in review for a day: the
+// commissioner can approve or veto, and other managers can vote so their view
+// is visible. Without a veto it goes through when the review ends.
+model Trade {
+  id             String    @id @default(cuid())
+  leagueId       String
+  proposerTeamId String
+  receiverTeamId String
+  // Players the proposer gives / gets.
+  givePlayerIds  Int[]
+  getPlayerIds   Int[]
+  message        String?
+  // "proposed" -> "rejected" | "cancelled" | "review" -> "completed" | "vetoed" | "failed"
+  status         String    @default("proposed")
+  // Why it was vetoed or failed.
+  note           String?
+  createdAt      DateTime  @default(now())
+  respondedAt    DateTime?
+  reviewEndsAt   DateTime?
+  completedAt    DateTime?
+
+  proposer Team        @relation("TradeProposer", fields: [proposerTeamId], references: [id], onDelete: Cascade)
+  receiver Team        @relation("TradeReceiver", fields: [receiverTeamId], references: [id], onDelete: Cascade)
+  votes    TradeVote[]
+
+  @@index([leagueId, status])
+}
+
+// Another manager's opinion on a trade in review. Advisory: the commissioner decides.
+model TradeVote {
+  tradeId   String
+  teamId    String
+  approve   Boolean
+  createdAt DateTime @default(now())
+
+  trade Trade @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  team  Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([tradeId, teamId])
 }

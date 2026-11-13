@@ -76,3 +76,24 @@ export function Avatar({ name, image, size = 32 }: { name: string; image: string
     </span>
   );
 }
+
+/** A centred dialog over a dimmed page. Escape or a click outside closes it. */
+export function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onKeyDown={(e) => e.key === "Escape" && onClose()}
+    >
+      <div role="dialog" aria-modal="true" aria-label={title} className="flex max-h-[85dvh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-surface p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold">{title}</h2>
+          <button className="size-9 rounded-lg text-muted hover:text-text" onClick={onClose} aria-label="Close" autoFocus>
+            ✕
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}

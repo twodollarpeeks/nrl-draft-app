@@ -29,7 +29,8 @@ export async function startSeason(tx: Tx, leagueId: string, teamOrder: readonly 
   const league = await tx.league.findUniqueOrThrow({ where: { id: leagueId } });
   const settings = LeagueSettings.parse(league.settings);
   const firstRound = await firstFantasyRound(tx, league.season, now);
-  await tx.league.update({ where: { id: leagueId }, data: { firstRound } });
+  // Rolling waivers start in reverse draft order.
+  await tx.league.update({ where: { id: leagueId }, data: { firstRound, waiverOrder: [...teamOrder].reverse() } });
 
   await tx.matchup.deleteMany({ where: { leagueId } });
   if (settings.matchups.mode !== "headToHead") return;
@@ -48,5 +49,5 @@ export async function startSeason(tx: Tx, leagueId: string, teamOrder: readonly 
 export async function unstartSeason(tx: Tx, leagueId: string) {
   await tx.matchup.deleteMany({ where: { leagueId } });
   await tx.lineup.deleteMany({ where: { leagueId } });
-  await tx.league.update({ where: { id: leagueId }, data: { firstRound: null } });
+  await tx.league.update({ where: { id: leagueId }, data: { firstRound: null, waiverOrder: [] } });
 }

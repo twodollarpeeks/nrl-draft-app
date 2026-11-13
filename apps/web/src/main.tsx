@@ -20,6 +20,7 @@ import { JoinPage } from "./pages/JoinPage.tsx";
 import { LeaguePage } from "./pages/LeaguePage.tsx";
 import { LeagueSettingsPage } from "./pages/LeagueSettingsPage.tsx";
 import { LeaguesPage } from "./pages/LeaguesPage.tsx";
+import { PlayersPage } from "./pages/PlayersPage.tsx";
 import { ProfilePage } from "./pages/ProfilePage.tsx";
 import { SignInPage } from "./pages/SignInPage.tsx";
 
@@ -49,6 +50,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/l/:id/matchups/:round?" element={authed(<MatchupsPage />)} />
           <Route path="/l/:id/matchup/:round/:homeId/:awayId" element={authed(<MatchupPage />)} />
           <Route path="/l/:id/ladder" element={authed(<LadderPage />)} />
+          <Route path="/l/:id/players" element={authed(<PlayersPage />)} />
           <Route path="/l/:id/settings" element={authed(<LeagueSettingsPage />)} />
           <Route path="/mock" element={authed(<MockDraftsPage />)} />
           <Route path="/mock/play" element={authed(<MockRoomPage />)} />
