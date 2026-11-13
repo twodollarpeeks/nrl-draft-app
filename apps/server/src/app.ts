@@ -14,6 +14,8 @@ import { registerLeagueRoutes } from "./leagues/routes.ts";
 import { registerMockRoutes } from "./mock/routes.ts";
 import { registerRosterRoutes } from "./roster/routes.ts";
 import { RosterService } from "./roster/service.ts";
+import { registerTradeRoutes } from "./trades/routes.ts";
+import { TradeService } from "./trades/service.ts";
 import type { LeagueServiceOptions } from "./leagues/service.ts";
 import { registerSeasonRoutes } from "./season/routes.ts";
 import { SeasonService } from "./season/service.ts";
@@ -69,6 +71,7 @@ export async function buildApp({ env, db, auth, getUser, draft, leagues, season,
     seasonService.beforeLoad = (leagueId) => roster.settle(leagueId);
     registerSeasonRoutes(app, seasonService, guards);
     registerRosterRoutes(app, roster, guards);
+    registerTradeRoutes(app, new TradeService(db, seasonService, roster, season ?? {}), guards);
     app.decorate("draftEngine", engine);
 
     if (realtime) {

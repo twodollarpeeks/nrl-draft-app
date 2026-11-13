@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import {
   canSwap,
   lineupErrors,
@@ -147,6 +147,14 @@ function TeamRound({ league, season, view }: { league: LeagueDetail; season: Sea
             <div className="font-mono text-4xl font-bold tabular-nums">{formatPoints(view.score.total)}</div>
           </Card>
 
+          {!isMine && (
+            <Link
+              to={`/l/${league.id}/trades/new?with=${view.teamId}`}
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-surface-2 px-4 text-sm font-semibold hover:bg-border"
+            >
+              Propose a trade
+            </Link>
+          )}
           {view.editable && (
             <p className="text-xs text-muted">
               <span className="lg:hidden">Tap a player, then tap where they should go.</span>

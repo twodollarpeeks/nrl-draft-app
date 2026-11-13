@@ -442,3 +442,63 @@ export interface ActivityItem {
   kind: "add" | "drop" | "waiver" | "trade";
   text: string;
 }
+
+// ---- Trades ---------------------------------------------------------------------
+
+export const MAX_TRADE_PLAYERS = 6;
+
+export const ProposeTradeInput = z
+  .object({
+    fromTeamId: z.string(),
+    toTeamId: z.string(),
+    /** Players the proposing team gives. */
+    give: z.array(z.number().int()).min(1, "Choose at least one player to give").max(MAX_TRADE_PLAYERS),
+    /** Players it gets in return. */
+    get: z.array(z.number().int()).min(1, "Choose at least one player to get").max(MAX_TRADE_PLAYERS),
+    message: z.string().trim().max(200).optional(),
+  })
+  .refine((t) => t.fromTeamId !== t.toTeamId, { message: "Trade with another team" });
+export type ProposeTradeInput = z.infer<typeof ProposeTradeInput>;
+
+export const TradeVoteInput = z.object({ approve: z.boolean() });
+
+export type TradeStatus = "proposed" | "rejected" | "cancelled" | "review" | "completed" | "vetoed" | "failed";
+
+export interface TradePlayer {
+  id: number;
+  name: string;
+  positions: NrlPosition[];
+  club: string | null;
+}
+
+export interface TradeView {
+  id: string;
+  status: TradeStatus;
+  createdAt: string;
+  reviewEndsAt: string | null;
+  completedAt: string | null;
+  message: string | null;
+  /** Why it was vetoed or failed. */
+  note: string | null;
+  proposer: { teamId: string; name: string };
+  receiver: { teamId: string; name: string };
+  /** What the proposer gives (the receiver gets) and gets. */
+  give: TradePlayer[];
+  get: TradePlayer[];
+  /** Other managers' views, while it's in review and after. */
+  votes: { approve: string[]; veto: string[] };
+  myVote: boolean | null;
+  can: { accept: boolean; reject: boolean; cancel: boolean; vote: boolean; approve: boolean; veto: boolean };
+}
+
+export interface TradesView {
+  leagueId: string;
+  myTeamId: string;
+  isCommissioner: boolean;
+  /** Trades close when this round starts (null: no deadline). */
+  deadline: { round: number; closed: boolean } | null;
+  /** How long accepted trades are reviewed for. */
+  reviewHours: number;
+  teams: Array<{ id: string; name: string; squad: TradePlayer[] }>;
+  trades: TradeView[];
+}

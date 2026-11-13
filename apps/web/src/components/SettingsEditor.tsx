@@ -7,6 +7,7 @@ import {
   NRL_LAST_ROUND,
   seasonRounds,
   squadSize,
+  tradesCloseRound,
   POSITION_GROUPS,
   POSITION_GROUP_LABELS,
   positionGroups,
@@ -173,6 +174,7 @@ export function SettingsEditor({
               ))}
             </fieldset>
             <SeasonEnd value={value} disabled={!can.format} onChange={(seasonEndRound) => set("seasonEndRound", seasonEndRound)} />
+          <TradeDeadline value={value} onChange={(tradeDeadlineRound) => set("tradeDeadlineRound", tradeDeadlineRound)} />
           </div>
         </Card>
 
@@ -278,6 +280,34 @@ function SeasonEnd({
 function slotHint(eligible: readonly NrlPosition[]): string {
   const groups = positionGroups(eligible);
   return groups.length === POSITION_GROUPS.length ? "Any player" : groups.map((g) => POSITION_GROUP_LABELS[g]).join(", ");
+}
+
+/** When trades close: the start of a round, or never. */
+function TradeDeadline({ value, onChange }: { value: LeagueSettings; onChange: (round: number | null) => void }) {
+  const r = seasonRounds(value.seasonEndRound, value.matchups);
+  const current = tradesCloseRound(value);
+  const last = r.grandFinalRound ?? r.lastRegularRound;
+  const rounds = Array.from({ length: Math.max(0, last - 1) }, (_, i) => i + 2);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">Trades close</span>
+        <select
+          className={inputClass}
+          value={current ?? "none"}
+          onChange={(e) => onChange(e.target.value === "none" ? null : Number(e.target.value))}
+        >
+          {rounds.map((n) => (
+            <option key={n} value={n}>
+              When round {n} starts
+            </option>
+          ))}
+          <option value="none">No deadline</option>
+        </select>
+      </label>
+      <span className="text-xs text-muted">Default: two rounds before the finals (or the end of the season).</span>
+    </div>
+  );
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {

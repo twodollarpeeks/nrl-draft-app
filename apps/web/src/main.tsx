@@ -22,6 +22,7 @@ import { LeagueSettingsPage } from "./pages/LeagueSettingsPage.tsx";
 import { LeaguesPage } from "./pages/LeaguesPage.tsx";
 import { PlayersPage } from "./pages/PlayersPage.tsx";
 import { ProfilePage } from "./pages/ProfilePage.tsx";
+import { ProposeTradePage, TradesPage } from "./pages/TradesPage.tsx";
 import { SignInPage } from "./pages/SignInPage.tsx";
 
 const queryClient = new QueryClient({
@@ -51,6 +52,8 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/l/:id/matchup/:round/:homeId/:awayId" element={authed(<MatchupPage />)} />
           <Route path="/l/:id/ladder" element={authed(<LadderPage />)} />
           <Route path="/l/:id/players" element={authed(<PlayersPage />)} />
+          <Route path="/l/:id/trades" element={authed(<TradesPage />)} />
+          <Route path="/l/:id/trades/new" element={authed(<ProposeTradePage />)} />
           <Route path="/l/:id/settings" element={authed(<LeagueSettingsPage />)} />
           <Route path="/mock" element={authed(<MockDraftsPage />)} />
           <Route path="/mock/play" element={authed(<MockRoomPage />)} />

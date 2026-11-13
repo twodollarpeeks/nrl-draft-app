@@ -76,6 +76,8 @@ export function applyCommissionerLimits(wanted: LeagueSettings, base: LeagueSett
     draft: can.draftTimer ? wanted.draft : base.draft,
     matchups: can.format ? wanted.matchups : base.matchups,
     seasonEndRound: can.format ? wanted.seasonEndRound : base.seasonEndRound,
+    // Always the commissioner's call, like the league size.
+    tradeDeadlineRound: wanted.tradeDeadlineRound,
     scoring,
   };
 }

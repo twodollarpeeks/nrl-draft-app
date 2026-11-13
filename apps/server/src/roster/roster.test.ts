@@ -5,6 +5,7 @@ import {
   type LeagueSettings,
   type PlayersView,
   type TeamRoundView,
+  type TradesView,
 } from "@nrl/shared";
 import { createUser, hasTestDb, resetDb, testDb } from "../../../../test/db.ts";
 import { buildApp } from "../app.ts";
@@ -245,5 +246,110 @@ describe.runIf(hasTestDb)("free agency and waivers", () => {
     expect((await players(1)).body.claims.map((c) => c.player.id)).toEqual([3, 4]);
     expect((await call(users[1]!.id, "DELETE", `/api/leagues/${leagueId}/waivers/claims/${mine[0]!.id}`)).status).toBe(204);
     expect((await players(1)).body.claims.map((c) => c.player.id)).toEqual([3]);
+  });
+
+  describe("trades", () => {
+    const trades = (u: number) => call<TradesView>(users[u]!.id, "GET", `/api/leagues/${leagueId}/trades`);
+    const propose = (u: number, from: number, to: number, give: number[], get: number[]) =>
+      call<{ error: string; message: string }>(users[u]!.id, "POST", `/api/leagues/${leagueId}/trades`, {
+        fromTeamId: teamIds[from], toTeamId: teamIds[to], give, get, message: "Deal?",
+      });
+    const act = (u: number, tradeId: string, action: string, body?: unknown) =>
+      call<{ error: string }>(users[u]!.id, "POST", `/api/leagues/${leagueId}/trades/${tradeId}/${action}`, body ?? {});
+    const latest = async (u = 0) => (await trades(u)).body.trades[0]!;
+
+    it("checks a proposal: your own players, theirs, and room in both squads", async () => {
+      expect((await propose(1, 0, 1, [4], [13])).status).toBe(403); // not their team
+      expect((await propose(0, 0, 1, [13], [14])).body).toMatchObject({ error: "not_in_squad" });
+      expect((await propose(0, 0, 1, [4], [13, 14])).body).toMatchObject({ error: "squad_full" });
+      expect((await propose(0, 0, 1, [4], [13])).status).toBe(204);
+      const t = await latest(1);
+      expect(t).toMatchObject({ status: "proposed", message: "Deal?", give: [{ id: 4 }], get: [{ id: 13 }] });
+      expect(t.can).toMatchObject({ accept: true, reject: true, cancel: false });
+      expect((await latest(0)).can).toMatchObject({ accept: false, cancel: true });
+    });
+
+    it("goes through a day after it's accepted, keeping earlier rounds as they were", async () => {
+      clock = new Date(kickoff(3).getTime() - 3 * DAY); // the review ends before round 3
+      const round1 = (await teamRound(0, 0, 1)).body.score.total;
+      await propose(0, 0, 1, [4], [13]);
+      const id = (await latest()).id;
+      expect((await act(1, id, "accept")).status).toBe(204);
+      const review = await latest(2);
+      expect(review.status).toBe("review");
+      expect(new Date(review.reviewEndsAt!).getTime()).toBe(clock.getTime() + DAY);
+
+      // Other managers can vote; the two teams can't.
+      expect((await act(1, id, "vote", { approve: true })).status).toBe(403);
+      expect((await act(2, id, "vote", { approve: false })).status).toBe(204);
+      expect((await act(3, id, "vote", { approve: true })).status).toBe(204);
+      const names = (await trades(0)).body.teams.map((t) => t.name);
+      expect((await latest(2))).toMatchObject({ myVote: false, votes: { approve: [names[3]], veto: [names[2]] } });
+
+      clock = new Date(clock.getTime() + DAY - 60_000);
+      await trades(0);
+      expect(await squadIds(0)).toContain(4);
+      clock = new Date(clock.getTime() + 120_000);
+      expect((await latest()).status).toBe("completed");
+      expect(await squadIds(0)).toEqual([1, 2, 3, 13]);
+      expect(await squadIds(1)).toEqual([4, 11, 12, 14]);
+      expect((await teamRound(0, 0, 1)).body.score.total).toBe(round1);
+      const activity = (await call<ActivityItem[]>(users[0]!.id, "GET", `/api/leagues/${leagueId}/activity`)).body;
+      expect(activity[0]!.text).toBe(`Trade: ${names[0]} get P 13; ${names[1]} get P 4`);
+    });
+
+    it("can be rejected or withdrawn before it's accepted", async () => {
+      await propose(0, 0, 1, [4], [13]);
+      const id = (await latest()).id;
+      expect((await act(0, id, "reject")).status).toBe(403);
+      expect((await act(0, id, "cancel")).status).toBe(204);
+      expect((await act(1, id, "accept")).body).toMatchObject({ error: "trade_not_open" });
+      clock = new Date(clock.getTime() + 1000);
+      await propose(0, 0, 1, [4], [13]);
+      expect((await act(1, (await latest()).id, "reject")).status).toBe(204);
+      expect((await latest()).status).toBe("rejected");
+    });
+
+    it("lets the commissioner approve straight away or veto; managers can't", async () => {
+      await propose(1, 1, 2, [13], [23]);
+      const id = (await latest()).id;
+      await act(2, id, "accept");
+      expect((await act(1, id, "veto")).status).toBe(403);
+      expect((await act(0, id, "veto", { note: "Too lopsided" })).status).toBe(204);
+      expect(await latest()).toMatchObject({ status: "vetoed", note: "Too lopsided" });
+
+      clock = new Date(clock.getTime() + 1000);
+      await propose(1, 1, 2, [13], [23]);
+      const again = (await latest()).id;
+      await act(2, again, "accept");
+      expect((await act(0, again, "approve")).status).toBe(204);
+      expect((await latest()).status).toBe("completed");
+      expect(await squadIds(1)).toContain(23);
+    });
+
+    it("waits for players' games to finish, and fails other offers for the same players", async () => {
+      await propose(0, 0, 1, [4], [13]);
+      const first = (await latest()).id;
+      clock = new Date(clock.getTime() + 1000);
+      await propose(0, 0, 2, [4], [23]);
+      await act(1, first, "accept");
+      clock = new Date(kickoff(3).getTime() + 3_600_000); // P 4 (Alpha) is playing
+      expect((await act(0, first, "approve")).status).toBe(204);
+      expect((await trades(0)).body.trades.find((t) => t.id === first)!.status).toBe("review");
+      clock = new Date(kickoff(3).getTime() + 3 * DAY); // round 3 is over
+      const list = (await trades(0)).body.trades;
+      expect(list.find((t) => t.id === first)!.status).toBe("completed");
+      expect(list.find((t) => t.id !== first)).toMatchObject({ status: "failed", note: expect.stringMatching(/traded elsewhere/) });
+    });
+
+    it("closes when the deadline round starts (two rounds before the finals by default)", async () => {
+      expect((await trades(0)).body.deadline).toEqual({ round: 9, closed: false });
+      await propose(0, 0, 1, [4], [13]);
+      clock = new Date(kickoff(9).getTime() + 60_000);
+      const view = (await trades(1)).body;
+      expect(view.deadline).toEqual({ round: 9, closed: true });
+      expect(view.trades[0]).toMatchObject({ status: "failed" });
+      expect((await propose(0, 0, 1, [4], [13])).body).toMatchObject({ error: "trades_closed" });
+    });
   });
 });

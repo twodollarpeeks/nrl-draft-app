@@ -5,6 +5,7 @@ import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
 import { formatPoints, useRound, useSeason } from "../lib/season.ts";
 import { MatchupCard } from "./MatchupsPage.tsx";
 import { Activity } from "./PlayersPage.tsx";
+import { useTrades } from "../lib/trades.ts";
 import { scoringSummary } from "../components/ScoringEditor.tsx";
 import { AppShell } from "../components/Layout.tsx";
 import { Avatar, Button, Card, ErrorText, SectionTitle, Spinner, inputClass } from "../components/ui.tsx";
@@ -25,6 +26,7 @@ export function LeaguePage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6">
         <div className="flex flex-col gap-4">
           {inSeason && <ThisRoundCard league={league} />}
+          {inSeason && <TradesCard league={league} />}
           <DraftCard league={league} />
           {league.status === "setup" && <InviteCard league={league} spotsLeft={open} />}
           {league.status === "setup" && (
@@ -96,6 +98,29 @@ function LadderSnapshot({ league }: { league: LeagueDetail }) {
         ))}
       </ol>
     </Card>
+  );
+}
+
+/** Trade offers waiting for you, and trades in review. */
+function TradesCard({ league }: { league: LeagueDetail }) {
+  const trades = useTrades(league.id);
+  const t = trades.data?.trades ?? [];
+  const forMe = t.filter((x) => x.status === "proposed" && x.receiver.teamId === league.myTeamId && x.can.accept).length;
+  const review = t.filter((x) => x.status === "review").length;
+  const summary = [forMe && `${forMe} offer${forMe === 1 ? "" : "s"} for you`, review && `${review} in review`].filter(Boolean).join(" · ");
+  return (
+    <Link
+      to={`/l/${league.id}/trades`}
+      className={`flex items-center justify-between rounded-2xl border p-4 ${forMe ? "border-accent bg-accent/10" : "border-border bg-surface hover:border-accent"}`}
+    >
+      <div>
+        <div className="font-semibold">Trades</div>
+        <div className="text-sm text-muted">{summary || "Make an offer to another team."}</div>
+      </div>
+      <span aria-hidden className="text-accent">
+        →
+      </span>
+    </Link>
   );
 }
 

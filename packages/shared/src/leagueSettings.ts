@@ -165,12 +165,24 @@ export const LeagueSettings = z
     matchups: MatchupSettings,
     // Leagues created before this setting existed ran the full season.
     seasonEndRound: SeasonEndRound.default(NRL_LAST_ROUND),
+    // Trades close when this round starts. null: no deadline; absent: the default (see tradesCloseRound).
+    tradeDeadlineRound: z.number().int().min(1).max(NRL_LAST_ROUND).nullable().optional(),
   })
   .refine((s) => s.matchups.mode !== "headToHead" || s.matchups.finalsTeams <= s.teamCount, {
     message: "More finals teams than teams in the league",
     path: ["matchups", "finalsTeams"],
   });
 export type LeagueSettings = z.infer<typeof LeagueSettings>;
+
+/**
+ * The round whose start closes trading, or null for no deadline. By default,
+ * two rounds before the finals (or the end of a season without them).
+ */
+export function tradesCloseRound(s: Pick<LeagueSettings, "tradeDeadlineRound" | "seasonEndRound" | "matchups">): number | null {
+  if (s.tradeDeadlineRound === null) return null;
+  if (s.tradeDeadlineRound !== undefined) return s.tradeDeadlineRound;
+  return Math.max(1, seasonRounds(s.seasonEndRound, s.matchups).lastRegularRound - 1);
+}
 
 export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
   teamCount: 8,
