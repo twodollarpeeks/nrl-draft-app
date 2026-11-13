@@ -184,6 +184,9 @@ describe.runIf(hasTestDb)("season play", () => {
       const url = `/api/leagues/${leagueId}/teams/${teamIds[1]}/rounds/1/lineup`;
       expect((await call(users[1]!.id, "PUT", url, { starters: { HB_HK: [12], FWD: [11], OB: [13] }, bench: [14] })).status).toBe(400);
       expect((await call(users[2]!.id, "PUT", url, { starters: { HB_HK: [11], FWD: [12], OB: [13] }, bench: [14] })).status).toBe(403);
+      // The commissioner (manager 0) can fix anyone's lineup.
+      expect((await call(users[0]!.id, "PUT", url, { starters: { HB_HK: [11], FWD: [12], OB: [14] }, bench: [13] })).status).toBe(200);
+      expect((await teamRound(0, 1, 1)).body).toMatchObject({ editable: true, lineup: { starters: { OB: [14] } } });
       expect((await teamRound(1, 1, 13)).status).toBe(404);
     });
   });

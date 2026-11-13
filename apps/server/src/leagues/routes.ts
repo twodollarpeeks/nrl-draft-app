@@ -3,6 +3,7 @@ import {
   JoinLeagueInput,
   RenameTeamInput,
   SetDraftOrderInput,
+  TeamIdInput,
   UpdateLeagueInput,
   UpdateProfileInput,
   SCORING_STATS,
@@ -83,6 +84,21 @@ export function registerLeagueRoutes(
 
   app.post<IdParams>("/api/leagues/:id/draft-order/randomise", async (req) =>
     leagues.randomiseDraftOrder(await requireUser(req), req.params.id),
+  );
+
+  // Commissioner tools.
+  app.post<IdParams>("/api/leagues/:id/handover", async (req) =>
+    leagues.createHandover(await requireUser(req), req.params.id, TeamIdInput.parse(req.body).teamId),
+  );
+  app.delete<{ Params: { id: string; teamId: string } }>("/api/leagues/:id/handover/:teamId", async (req) =>
+    leagues.cancelHandover(await requireUser(req), req.params.id, req.params.teamId),
+  );
+  app.post<IdParams>("/api/leagues/:id/commissioner", async (req) =>
+    leagues.makeCommissioner(await requireUser(req), req.params.id, TeamIdInput.parse(req.body).teamId),
+  );
+  app.get<CodeParams>("/api/handover/:code", async (req) => leagues.previewHandover(await requireUser(req), req.params.code));
+  app.post<CodeParams>("/api/handover/:code/accept", async (req) =>
+    leagues.acceptHandover(await requireUser(req), req.params.code),
   );
 
   app.patch<IdParams>("/api/teams/:id", async (req) => {

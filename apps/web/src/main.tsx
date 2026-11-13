@@ -16,6 +16,7 @@ import { MockDraftsPage } from "./pages/MockDraftsPage.tsx";
 import { MockResultPage } from "./pages/MockResultPage.tsx";
 import { MockRoomPage } from "./pages/MockRoomPage.tsx";
 import { TeamRoundPage } from "./pages/TeamRoundPage.tsx";
+import { HandoverPage } from "./pages/HandoverPage.tsx";
 import { JoinPage } from "./pages/JoinPage.tsx";
 import { LeaguePage } from "./pages/LeaguePage.tsx";
 import { LeagueSettingsPage } from "./pages/LeagueSettingsPage.tsx";
@@ -45,6 +46,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/leagues" element={authed(<LeaguesPage />)} />
           <Route path="/leagues/new" element={authed(<CreateLeaguePage />)} />
           <Route path="/join/:code" element={authed(<JoinPage />)} />
+          <Route path="/handover/:code" element={authed(<HandoverPage />)} />
           <Route path="/l/:id" element={authed(<LeaguePage />)} />
           <Route path="/l/:id/draft" element={authed(<DraftRoomPage />)} />
           <Route path="/l/:id/team/:teamId/:round?" element={authed(<TeamRoundPage />)} />

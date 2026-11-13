@@ -416,7 +416,8 @@ export class SeasonService {
       round: roundNo,
       roundTitle: round?.title ?? `Round ${roundNo}`,
       roundStatus: round?.status ?? "upcoming",
-      editable: team.ownerId === user.id && round?.status !== "complete",
+      // The commissioner can fix anyone's lineup (say, for a manager who's away).
+      editable: (team.ownerId === user.id || ctx.league.commissionerId === user.id) && round?.status !== "complete",
       lineupSource: source,
       lineup,
       players: views,
@@ -429,7 +430,7 @@ export class SeasonService {
     this.checkRound(ctx, roundNo);
     const team = ctx.teams.find((t) => t.id === teamId);
     if (!team) throw notFound("Team");
-    if (team.ownerId !== user.id) throw forbidden("That's not your team");
+    if (team.ownerId !== user.id && ctx.league.commissionerId !== user.id) throw forbidden("That's not your team");
     if (ctx.rounds.get(roundNo)?.status === "complete") throw conflict("round_over", "This round is over");
 
     const errors = lineupErrors(ctx.settings.roster, this.squadFor(ctx, team, roundNo), next);

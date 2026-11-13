@@ -6,6 +6,7 @@ import {
   leagueDefaults,
   type CreateLeagueInput,
   type DraftOrderMode,
+  type HandoverPreview,
   type InvitePreview,
   type LeagueDetail,
   type LeagueStatus,
@@ -299,6 +300,80 @@ export class LeagueService {
     return this.get(user, team.leagueId);
   }
 
+  // ---- Commissioner tools ----------------------------------------------------------
+
+  /** A link that hands a team to whoever opens it (a new manager). */
+  async createHandover(user: SessionUser, leagueId: string, teamId: string): Promise<LeagueDetail> {
+    const { team } = await this.commissionerTeam(user, leagueId, teamId);
+    if (team.ownerId === user.id) {
+      throw conflict("own_team", "Make someone else commissioner before handing over your own team");
+    }
+    for (let i = 0; i < 5; i++) {
+      try {
+        await this.db.team.update({ where: { id: teamId }, data: { handoverCode: newInviteCode(10) } });
+        await this.db.auditLog.create({ data: { leagueId, actorId: user.id, action: "team.handover.link", payload: { teamId } } });
+        return this.get(user, leagueId);
+      } catch (err) {
+        if ((err as { code?: string }).code !== "P2002") throw err; // code clash: try another
+      }
+    }
+    throw new AppError(500, "handover_code", "Couldn't make a link");
+  }
+
+  async cancelHandover(user: SessionUser, leagueId: string, teamId: string): Promise<LeagueDetail> {
+    await this.commissionerTeam(user, leagueId, teamId);
+    await this.db.team.update({ where: { id: teamId }, data: { handoverCode: null } });
+    return this.get(user, leagueId);
+  }
+
+  async previewHandover(user: SessionUser, code: string): Promise<HandoverPreview> {
+    const team = await this.db.team.findUnique({
+      where: { handoverCode: code },
+      include: { owner: true, league: { include: { teams: true } } },
+    });
+    if (!team) throw notFound("Handover link");
+    return {
+      leagueId: team.leagueId,
+      leagueName: team.league.name,
+      teamName: team.name,
+      currentManager: team.owner.name,
+      alreadyMember: team.league.teams.some((t) => t.ownerId === user.id),
+    };
+  }
+
+  /** Take over a team from its handover link. */
+  async acceptHandover(user: SessionUser, code: string): Promise<LeagueDetail> {
+    const leagueId = await this.db.$transaction(async (tx) => {
+      const team = await tx.team.findUnique({ where: { handoverCode: code }, include: { league: { include: { teams: true } } } });
+      if (!team) throw notFound("Handover link");
+      if (team.league.teams.some((t) => t.ownerId === user.id)) {
+        throw conflict("already_member", "You already have a team in this league");
+      }
+      await tx.team.update({ where: { id: team.id }, data: { ownerId: user.id, handoverCode: null } });
+      await tx.auditLog.create({
+        data: { leagueId: team.leagueId, actorId: user.id, action: "team.handover", payload: { teamId: team.id, from: team.ownerId, to: user.id } },
+      });
+      return team.leagueId;
+    });
+    return this.get(user, leagueId);
+  }
+
+  /** Pass the commissioner role to another manager. */
+  async makeCommissioner(user: SessionUser, leagueId: string, teamId: string): Promise<LeagueDetail> {
+    const { team } = await this.commissionerTeam(user, leagueId, teamId);
+    await this.db.league.update({ where: { id: leagueId }, data: { commissionerId: team.ownerId } });
+    await this.db.auditLog.create({ data: { leagueId, actorId: user.id, action: "league.commissioner", payload: { to: team.ownerId } } });
+    return this.get(user, leagueId);
+  }
+
+  private async commissionerTeam(user: SessionUser, leagueId: string, teamId: string) {
+    const league = await this.loadForMember(user, leagueId);
+    if (league.commissionerId !== user.id) throw forbidden("Only the commissioner can do that");
+    const team = league.teams.find((t) => t.id === teamId);
+    if (!team) throw notFound("Team");
+    return { league, team };
+  }
+
   private async loadForMember(user: SessionUser, leagueId: string): Promise<LeagueWithTeams> {
     const league = await this.db.league.findUnique({ where: { id: leagueId }, include: leagueWithTeams });
     // Non-members get a 404 rather than a 403, so league ids don't leak.
@@ -357,6 +432,7 @@ function toDetail(league: LeagueWithTeams, userId: string): LeagueDetail {
       name: t.name,
       owner: { id: t.owner.id, name: t.owner.name, image: t.owner.image },
       isCommissioner: t.ownerId === league.commissionerId,
+      ...(league.commissionerId === userId ? { handoverCode: t.handoverCode } : {}),
     })),
   };
 }

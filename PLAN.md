@@ -37,6 +37,26 @@ when a decision changes.
   grand final with finals (2, 3 or 4 finals weeks before it), otherwise the
   last round.
 - **Ladder ties:** wins (draw = half), points for, head-to-head, points against.
+- **Free agency and waivers:** unowned players are free agents (added
+  straight away, dropping someone if the squad is full) unless they were
+  dropped, or their game this round started, since the last clearing: then
+  they're on waivers. Waivers clear Wednesday 6am Sydney time (after
+  Tuesday's team lists), in rolling order: reverse draft order to start, and
+  a team that wins a claim goes to the back. Teams rank their own claims.
+  Claims settle on the first request after the clearing, as at the clearing,
+  so a sleeping free server doesn't matter. Players whose game this round has
+  started can't be added, dropped or traded until the round is over.
+- **Squad history:** before a squad changes, every round that has started
+  keeps its lineup (and so its squad), so later moves never change past
+  scores.
+- **Trades:** up to 6 players each way. Accepted trades are reviewed for 24
+  hours: other managers vote (advisory, shown on the trade), the commissioner
+  approves early or vetoes. Without a veto the trade goes through when the
+  review ends. Trades close when a deadline round starts (league setting;
+  default two rounds before the finals or season end; or no deadline).
+- **Commissioner tools:** edit any team's lineup; hand a team to a new
+  manager with a single-use link (the old manager leaves); pass the
+  commissioner role to another manager.
 - **Ownership:** a player is on at most one team per league; a user can be in
   many leagues.
 - **Hosting (free):** Vercel (web), Render free (API + draft sockets; wake it
@@ -82,5 +102,6 @@ when a decision changes.
 
 ## Post-MVP
 
-Auction drafts, waivers/free agents, trades, chat, activity feed,
-notifications, mock drafts, public leagues.
+Done: free agency and waivers, trades, commissioner tools, activity feed,
+solo mock drafts. Still to come: group mock drafts with CPU fill,
+notifications, auction drafts, chat, public leagues.

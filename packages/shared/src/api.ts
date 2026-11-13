@@ -55,6 +55,8 @@ export interface TeamSummary {
   name: string;
   owner: { id: string; name: string; image: string | null };
   isCommissioner: boolean;
+  /** Commissioner only: an open link to hand this team to a new manager. */
+  handoverCode?: string | null;
 }
 
 export interface LeagueSummary {
@@ -94,6 +96,18 @@ export interface InvitePreview {
   alreadyMember: boolean;
   reason?: "full" | "started";
 }
+
+/** Someone opening a link to take over a team. */
+export interface HandoverPreview {
+  leagueId: string;
+  leagueName: string;
+  teamName: string;
+  currentManager: string;
+  /** Already in the league (with another team): can't take this one too. */
+  alreadyMember: boolean;
+}
+
+export const TeamIdInput = z.object({ teamId: z.string() });
 
 export interface ApiError {
   error: string;

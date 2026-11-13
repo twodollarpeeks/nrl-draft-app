@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CreateLeagueInput,
+  HandoverPreview,
   InvitePreview,
   LeagueDefaults,
   LeagueDetail,
@@ -69,3 +70,20 @@ export const useSetDraftOrder = (id: string) =>
 
 export const useRandomiseDraftOrder = (id: string) =>
   useLeagueMutation(() => api<LeagueDetail>(`/api/leagues/${id}/draft-order/randomise`, { method: "POST" }));
+
+// ---- Commissioner tools -------------------------------------------------------
+
+export const useCreateHandover = (id: string) =>
+  useLeagueMutation((teamId: string) => api<LeagueDetail>(`/api/leagues/${id}/handover`, { method: "POST", body: { teamId } }));
+
+export const useCancelHandover = (id: string) =>
+  useLeagueMutation((teamId: string) => api<LeagueDetail>(`/api/leagues/${id}/handover/${teamId}`, { method: "DELETE" }));
+
+export const useMakeCommissioner = (id: string) =>
+  useLeagueMutation((teamId: string) => api<LeagueDetail>(`/api/leagues/${id}/commissioner`, { method: "POST", body: { teamId } }));
+
+export const useHandoverPreview = (code: string) =>
+  useQuery({ queryKey: ["handover", code], queryFn: () => api<HandoverPreview>(`/api/handover/${code}`), retry: false });
+
+export const useAcceptHandover = (code: string) =>
+  useLeagueMutation(() => api<LeagueDetail>(`/api/handover/${code}/accept`, { method: "POST" }));

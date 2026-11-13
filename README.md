@@ -16,6 +16,14 @@ finals at the end.
 - **Season:** lineups lock per player at kickoff; bye, not named and reserve
   warnings; ordered emergencies; live scores (final after a 24-hour stats
   review); side-by-side matchups; ladder and finals.
+- **Free agency and waivers:** pick up free agents straight away; players
+  just dropped or whose game has started go on waivers, claimed in rolling
+  order when waivers clear (Wednesday 6am Sydney time).
+- **Trades:** propose, accept or reject; accepted trades are reviewed for a
+  day (other managers vote, the commissioner approves or vetoes); a trade
+  deadline set per league.
+- **Commissioner tools:** fix any team's lineup, hand a team to a new
+  manager with a link, pass the commissioner role on.
 - **Data:** imported from nrl.com (draw, team lists, every player stat), on a
   schedule.
 - **Site admin:** default scoring over 46 stats with a position-balance

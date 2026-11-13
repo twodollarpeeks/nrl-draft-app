@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { seasonRounds, squadSize, type LeagueDetail } from "@nrl/shared";
+import { MIN_TEAMS, seasonRounds, squadSize, type LeagueDetail } from "@nrl/shared";
 import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
 import { formatPoints, useRound, useSeason } from "../lib/season.ts";
 import { MatchupCard } from "./MatchupsPage.tsx";
@@ -170,7 +170,10 @@ function ordinal(n: number) {
 }
 
 function DraftCard({ league }: { league: LeagueDetail }) {
-  const when = league.draftAt && league.status === "setup" ? `Draft ${formatDraftTime(league.draftAt)}` : null;
+  // The scheduled time came and went without enough teams to draft.
+  const missed =
+    league.status === "setup" && league.draftAt !== null && new Date(league.draftAt) <= new Date() && league.teamsJoined < MIN_TEAMS;
+  const when = league.draftAt && league.status === "setup" && !missed ? `Draft ${formatDraftTime(league.draftAt)}` : null;
   const [title, hint] = {
     setup: [
       "Draft room",
@@ -192,6 +195,12 @@ function DraftCard({ league }: { league: LeagueDetail }) {
       <div>
         <div className="font-semibold">{title}</div>
         {when && <div className="text-sm font-medium text-accent">{when}</div>}
+        {missed && (
+          <div className="text-sm font-medium text-danger">
+            The draft didn't start at its scheduled time: it needs at least {MIN_TEAMS} teams.
+            {league.isCommissioner ? " Invite more, then set a new time." : ""}
+          </div>
+        )}
         <div className="text-sm text-muted">{hint}</div>
       </div>
       <span aria-hidden className="text-accent">
@@ -283,9 +292,9 @@ function SettingsSummary({ league, className }: { league: LeagueDetail; classNam
     <Card className={className}>
       <div className="mb-3 flex items-center justify-between">
         <SectionTitle>Rules</SectionTitle>
-        {league.isCommissioner && league.status === "setup" && (
+        {league.isCommissioner && (
           <Link to={`/l/${league.id}/settings`} className="text-sm font-medium text-accent">
-            Edit
+            {league.status === "setup" ? "Edit" : "Commissioner tools"}
           </Link>
         )}
       </div>

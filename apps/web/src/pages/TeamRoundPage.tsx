@@ -147,6 +147,11 @@ function TeamRound({ league, season, view }: { league: LeagueDetail; season: Sea
             <div className="font-mono text-4xl font-bold tabular-nums">{formatPoints(view.score.total)}</div>
           </Card>
 
+          {!isMine && view.editable && (
+            <p role="status" className="rounded-xl border border-review/40 bg-review/10 px-3 py-2 text-sm text-review">
+              You're editing {view.ownerName}'s lineup as commissioner.
+            </p>
+          )}
           {!isMine && (
             <Link
               to={`/l/${league.id}/trades/new?with=${view.teamId}`}

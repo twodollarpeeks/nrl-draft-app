@@ -6,8 +6,11 @@ import { AppShell } from "../components/Layout.tsx";
 import { SettingsEditor, type SettingsLimits } from "../components/SettingsEditor.tsx";
 import { Button, Card, ErrorText, Field, SectionTitle, Spinner, inputClass } from "../components/ui.tsx";
 import {
+  useCancelHandover,
+  useCreateHandover,
   useLeague,
   useLeagueDefaults,
+  useMakeCommissioner,
   useRandomiseDraftOrder,
   useResetInvite,
   useSetDraftOrder,
@@ -107,6 +110,8 @@ function SettingsForm({ league, limits }: { league: LeagueDetail; limits: Settin
         </Button>
       </form>
 
+      <Managers league={league} />
+
       {!locked && (
         <Card className="lg:w-1/2">
           <SectionTitle>Invite link</SectionTitle>
@@ -118,5 +123,83 @@ function SettingsForm({ league, limits }: { league: LeagueDetail; limits: Settin
         </Card>
       )}
     </AppShell>
+  );
+}
+
+/**
+ * Replacing a manager who's dropped out: a link that hands their team to
+ * whoever opens it. And passing the commissioner role on.
+ */
+function Managers({ league }: { league: LeagueDetail }) {
+  const navigate = useNavigate();
+  const create = useCreateHandover(league.id);
+  const cancel = useCancelHandover(league.id);
+  const promote = useMakeCommissioner(league.id);
+  const [copied, setCopied] = useState<string | null>(null);
+  const busy = create.isPending || cancel.isPending || promote.isPending;
+  const link = (code: string) => `${window.location.origin}/handover/${code}`;
+
+  return (
+    <Card className="lg:w-1/2">
+      <SectionTitle>Managers</SectionTitle>
+      <p className="mb-3 text-sm text-muted">
+        If someone drops out, make a handover link for their team: whoever opens it takes the team over, squad and all,
+        and the old manager leaves the league.
+      </p>
+      <ul className="flex flex-col divide-y divide-border">
+        {league.teams.map((t) => (
+          <li key={t.id} className="flex flex-col gap-2 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">{t.name}</div>
+                <div className="truncate text-xs text-muted">
+                  {t.owner.name}
+                  {t.isCommissioner ? " · Commissioner" : ""}
+                </div>
+              </div>
+              {!t.isCommissioner && (
+                <div className="flex shrink-0 gap-2">
+                  {!t.handoverCode && (
+                    <Button variant="secondary" className="min-h-9" disabled={busy} onClick={() => create.mutate(t.id)}>
+                      Hand over
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    className="min-h-9"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!confirm(`Make ${t.owner.name} the commissioner? You'll lose commissioner tools.`)) return;
+                      promote.mutate(t.id, { onSuccess: () => navigate(`/l/${league.id}`) });
+                    }}
+                  >
+                    Make commissioner
+                  </Button>
+                </div>
+              )}
+            </div>
+            {t.handoverCode && (
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="flex min-h-9 min-w-0 flex-1 items-center truncate rounded-lg bg-surface-2 px-2 text-xs">{link(t.handoverCode)}</code>
+                <Button
+                  className="min-h-9"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(link(t.handoverCode!));
+                    setCopied(t.id);
+                    setTimeout(() => setCopied(null), 2000);
+                  }}
+                >
+                  {copied === t.id ? "Copied!" : "Copy link"}
+                </Button>
+                <Button variant="ghost" className="min-h-9" disabled={busy} onClick={() => cancel.mutate(t.id)}>
+                  Cancel link
+                </Button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      <ErrorText error={create.error ?? cancel.error ?? promote.error} />
+    </Card>
   );
 }
