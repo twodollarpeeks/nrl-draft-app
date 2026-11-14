@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type Query } from "@tanstack/react-query";
+import { useEffect } from "react";
 import type { Lineup, RoundView, SeasonOverview, TeamRoundView } from "@nrl/shared";
 import { api } from "./api.ts";
 
@@ -19,21 +20,44 @@ export const useSeason = (leagueId: string, enabled = true) =>
     refetchInterval: (q) => (q.state.data?.rounds.some((r) => r.status === "live") ? LIVE_REFRESH_MS : false),
   });
 
+// A finished round's scores don't change: no need to fetch it again for a while.
+const FINISHED_ROUND_STALE_MS = 10 * 60_000;
+
 export const useRound = (leagueId: string, round: number | undefined) =>
   useQuery({
     queryKey: seasonKeys.round(leagueId, round ?? 0),
     queryFn: () => api<RoundView>(`/api/leagues/${leagueId}/rounds/${round}`),
     enabled: round !== undefined,
+    staleTime: (q: Query<RoundView>) => (q.state.data?.status === "complete" ? FINISHED_ROUND_STALE_MS : 0),
+    // Moving between rounds, keep the last one on screen until the next arrives.
+    placeholderData: (prev) => prev,
     refetchInterval: (q) => (q.state.data?.status === "live" ? LIVE_REFRESH_MS : false),
   });
 
+const teamRoundQuery = (leagueId: string, teamId: string, round: number) => ({
+  queryKey: seasonKeys.team(leagueId, teamId, round),
+  queryFn: () => api<TeamRoundView>(`/api/leagues/${leagueId}/teams/${teamId}/rounds/${round}`),
+  staleTime: (q: Query<TeamRoundView>) => (q.state.data?.roundStatus === "complete" ? FINISHED_ROUND_STALE_MS : 0),
+});
+
 export const useTeamRound = (leagueId: string, teamId: string | undefined, round: number | undefined) =>
   useQuery({
-    queryKey: seasonKeys.team(leagueId, teamId ?? "", round ?? 0),
-    queryFn: () => api<TeamRoundView>(`/api/leagues/${leagueId}/teams/${teamId}/rounds/${round}`),
+    ...teamRoundQuery(leagueId, teamId ?? "", round ?? 0),
     enabled: !!teamId && round !== undefined,
+    // Same team, another round: keep showing the last one until it arrives.
+    placeholderData: (prev) => (prev?.teamId === teamId ? prev : undefined),
     refetchInterval: (q) => (q.state.data?.roundStatus === "live" ? LIVE_REFRESH_MS : false),
   });
+
+/** Load the rounds either side in the background, so the arrows are instant. */
+export function usePrefetchNeighbours(leagueId: string, teamId: string, round: number, first: number, last: number) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    for (const r of [round + 1, round - 1]) {
+      if (r >= first && r <= last) void qc.prefetchQuery(teamRoundQuery(leagueId, teamId, r));
+    }
+  }, [qc, leagueId, teamId, round, first, last]);
+}
 
 export function useSaveLineup(leagueId: string, teamId: string, round: number) {
   const qc = useQueryClient();

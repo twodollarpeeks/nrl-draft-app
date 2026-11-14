@@ -98,6 +98,8 @@ export interface SeasonContext {
 }
 
 type Db = PrismaClient | Prisma.TransactionClient;
+/** Load only these rounds' match stats (default: the whole season). */
+type ContextOptions = { rounds?: number[] };
 
 export class SeasonService {
   private readonly now: () => Date;
@@ -113,16 +115,20 @@ export class SeasonService {
 
   // ---- Loading -------------------------------------------------------------
 
-  private async load(user: SessionUser, leagueId: string): Promise<SeasonContext & { myTeamId: string }> {
+  private async load(user: SessionUser, leagueId: string, opts: ContextOptions = {}): Promise<SeasonContext & { myTeamId: string }> {
     await this.beforeLoad?.(leagueId);
-    const ctx = await this.context(leagueId);
+    const ctx = await this.context(leagueId, this.db, opts);
     const mine = ctx.teams.find((t) => t.ownerId === user.id);
     if (!mine) throw notFound("League");
     return { ...ctx, myTeamId: mine.id };
   }
 
-  /** A league's season, read through `db` (pass a transaction to read inside it). */
-  async context(leagueId: string, db: Db = this.db): Promise<SeasonContext> {
+  /**
+   * A league's season, read through `db` (pass a transaction to read inside
+   * it). Match stats are the bulk of it: pass `rounds` when only some rounds'
+   * scores are needed (a team's round view), and only those are loaded.
+   */
+  async context(leagueId: string, db: Db = this.db, opts: ContextOptions = {}): Promise<SeasonContext> {
     const league = await db.league.findUnique({
       where: { id: leagueId },
       include: { teams: { include: { owner: true }, orderBy: { createdAt: "asc" } } },
@@ -149,7 +155,9 @@ export class SeasonService {
       db.matchup.findMany({ where: { leagueId } }),
       db.appearance.groupBy({
         by: ["matchId"],
-        where: { match: { round: { season: league.season, number: { gte: firstRound, lte: settings.seasonEndRound } } } },
+        where: {
+          match: { round: { season: league.season, number: opts.rounds ? { in: opts.rounds } : { gte: firstRound, lte: settings.seasonEndRound } } },
+        },
       }),
     ]);
 
@@ -207,7 +215,10 @@ export class SeasonService {
     for (const list of squads.values()) list.sort((a, b) => (pickNo.get(a.id) ?? 1e9) - (pickNo.get(b.id) ?? 1e9));
 
     const apps = await db.appearance.findMany({
-      where: { playerId: { in: [...players.keys()] }, match: { round: { season: league.season } } },
+      where: {
+        playerId: { in: [...players.keys()] },
+        match: { round: { season: league.season, ...(opts.rounds ? { number: { in: opts.rounds } } : {}) } },
+      },
       select: {
         playerId: true, matchId: true, clubId: true, jersey: true, minutes: true, stats: true,
         match: { select: { round: { select: { number: true } } } },
@@ -402,7 +413,7 @@ export class SeasonService {
   // ---- Views -------------------------------------------------------------------
 
   async teamRound(user: SessionUser, leagueId: string, teamId: string, roundNo: number): Promise<TeamRoundView> {
-    const ctx = await this.load(user, leagueId);
+    const ctx = await this.load(user, leagueId, { rounds: [roundNo] });
     this.checkRound(ctx, roundNo);
     const team = ctx.teams.find((t) => t.id === teamId);
     if (!team) throw notFound("Team");
@@ -426,7 +437,7 @@ export class SeasonService {
   }
 
   async saveLineup(user: SessionUser, leagueId: string, teamId: string, roundNo: number, next: Lineup): Promise<TeamRoundView> {
-    const ctx = await this.load(user, leagueId);
+    const ctx = await this.load(user, leagueId, { rounds: [roundNo] });
     this.checkRound(ctx, roundNo);
     const team = ctx.teams.find((t) => t.id === teamId);
     if (!team) throw notFound("Team");

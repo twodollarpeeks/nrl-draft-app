@@ -28,7 +28,8 @@ export function MatchupsPage() {
       <div className="flex flex-col gap-4">
         <div className="lg:mx-auto lg:w-full lg:max-w-md">
           <RoundPicker
-            round={v.round}
+            round={round ?? v.round}
+            loading={view.isPlaceholderData}
             first={s.firstRound}
             last={s.grandFinalRound ?? s.lastRegularRound}
             title={v.title}

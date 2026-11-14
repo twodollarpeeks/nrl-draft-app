@@ -18,7 +18,7 @@ import { PositionBadge } from "../components/Position.tsx";
 import { RoundPicker } from "../components/LeagueNav.tsx";
 import { Button, Card, ErrorText, SectionTitle, Spinner } from "../components/ui.tsx";
 import { useLeague } from "../lib/queries.ts";
-import { formatKickoff, formatPoints, useSaveLineup, useSeason, useTeamRound } from "../lib/season.ts";
+import { formatKickoff, formatPoints, usePrefetchNeighbours, useSaveLineup, useSeason, useTeamRound } from "../lib/season.ts";
 
 export function TeamRoundPage() {
   const { id = "", teamId, round: roundParam } = useParams();
@@ -42,11 +42,34 @@ export function TeamRoundPage() {
       </AppShell>
     );
   }
-  return <TeamRound league={league.data} season={season.data} view={team.data} />;
+  return (
+    <TeamRound
+      league={league.data}
+      season={season.data}
+      view={team.data}
+      round={round ?? team.data.round}
+      loading={team.isPlaceholderData}
+    />
+  );
 }
 
-function TeamRound({ league, season, view }: { league: LeagueDetail; season: SeasonOverview; view: TeamRoundView }) {
+function TeamRound({
+  league,
+  season,
+  view,
+  round,
+  loading,
+}: {
+  league: LeagueDetail;
+  season: SeasonOverview;
+  view: TeamRoundView;
+  /** The round asked for: `view` is still the last one while it loads. */
+  round: number;
+  loading: boolean;
+}) {
   const navigate = useNavigate();
+  const lastRound = season.grandFinalRound ?? season.lastRegularRound;
+  usePrefetchNeighbours(league.id, view.teamId, round, season.firstRound, lastRound);
   const template = league.settings.roster;
   const save = useSaveLineup(league.id, view.teamId, view.round);
   const [draft, setDraft] = useState<Lineup | null>(null);
@@ -69,7 +92,7 @@ function TeamRound({ league, season, view }: { league: LeagueDetail; season: Sea
 
   function tap(spot: Spot, occupant: number | null) {
     setHint(null);
-    if (!view.editable) return;
+    if (!view.editable || loading) return;
     if (occupant !== null && players.get(occupant)?.locked) {
       setHint(`${players.get(occupant)!.name} is locked: their game has started.`);
       return;
@@ -124,14 +147,20 @@ function TeamRound({ league, season, view }: { league: LeagueDetail; season: Sea
   return (
     <AppShell title={view.teamName} back={`/l/${league.id}`} width="wide" league={{ id: league.id, myTeamId: season.myTeamId }}>
       {/* Desktop: round, score and save on the left; starters and bench side by side. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-6">
+      <div
+        className={`grid grid-cols-1 gap-4 transition-opacity lg:grid-cols-[300px_minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-6 ${
+          loading ? "[&>*:not(:first-child)]:opacity-50" : ""
+        }`}
+        aria-busy={loading}
+      >
         <div className="flex flex-col gap-4 lg:sticky lg:top-20">
           <RoundPicker
-            round={view.round}
+            round={round}
             first={season.firstRound}
-            last={season.grandFinalRound ?? season.lastRegularRound}
+            last={lastRound}
             title={view.roundTitle}
             status={view.roundStatus}
+            loading={loading}
             onChange={(r) => navigate(`/l/${league.id}/team/${view.teamId}/${r}`)}
           />
 
