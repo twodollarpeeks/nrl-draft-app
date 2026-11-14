@@ -104,6 +104,20 @@ describe("movedLockedPlayers", () => {
     expect(movedLockedPlayers(base, swapped, (id) => id === 9)).toEqual([9]);
   });
 
+  it("lets players leave or join the bench around a locked emergency", () => {
+    // Bench 9..14; 11 and 12 are locked. 10 (E2) goes into the empty FLEX spot, so 11 and 12 move up a place.
+    const empty: Lineup = { ...base, starters: { ...base.starters, FLEX: [null] }, bench: [...base.bench, 8] };
+    const promoted = swapSpots(empty, "bench:1", "FLEX:0");
+    const locked = (id: number) => id === 11 || id === 12;
+    expect(promoted.bench).toEqual([9, 11, 12, 13, 14, 8]);
+    expect(movedLockedPlayers(empty, promoted, locked)).toEqual([]);
+    // A starter swapping straight onto the bench above them is fine too.
+    expect(movedLockedPlayers(base, swapSpots(base, "FLEX:0", "bench:0"), locked)).toEqual([]);
+    // But they can't be taken off the bench or reordered among the others.
+    expect(movedLockedPlayers(empty, swapSpots(empty, "bench:2", "FLEX:0"), locked)).toEqual([11]);
+    expect(movedLockedPlayers(empty, swapSpots(empty, "bench:0", "bench:2"), locked)).toEqual([11]);
+  });
+
   it("counts a change of bench order for a locked player", () => {
     const reordered: Lineup = { ...base, bench: [base.bench[1]!, base.bench[0]!, ...base.bench.slice(2)] };
     expect(movedLockedPlayers(base, reordered, (id) => id === base.bench[0])).toEqual([base.bench[0]]);

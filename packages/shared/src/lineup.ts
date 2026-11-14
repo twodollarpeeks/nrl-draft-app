@@ -65,15 +65,25 @@ export function lineupErrors(template: RosterTemplate, squad: readonly SquadPlay
 }
 
 /**
- * Players who are locked (their match has kicked off) must stay exactly where
- * they were, and nobody else can take their spot. Returns the ids that moved.
+ * Players who are locked (their match has kicked off) must stay where they
+ * were. A locked starter keeps their exact spot (so nobody can take it). A
+ * locked emergency stays on the bench in the same order: the bench has no
+ * gaps, so players leaving it or joining it shift everyone below, and that
+ * isn't a move. What counts is their place among the players who are on the
+ * bench both before and after. Returns the ids that moved.
  */
 export function movedLockedPlayers(current: Lineup, next: Lineup, isLocked: (playerId: number) => boolean): number[] {
   const before = spotsOf(current);
   const after = spotsOf(next);
+  const stayed = new Set(current.bench.filter((id) => next.bench.includes(id)));
+  const place = (bench: number[], id: number) => bench.filter((x) => stayed.has(x)).indexOf(id);
   const moved: number[] = [];
   for (const [id, spot] of before) {
-    if (isLocked(id) && after.get(id) !== spot) moved.push(id);
+    if (!isLocked(id)) continue;
+    const ok = spot.startsWith("bench:")
+      ? stayed.has(id) && place(current.bench, id) === place(next.bench, id)
+      : after.get(id) === spot;
+    if (!ok) moved.push(id);
   }
   return moved;
 }

@@ -19,6 +19,7 @@ import { TradeService } from "./trades/service.ts";
 import type { LeagueServiceOptions } from "./leagues/service.ts";
 import { registerSeasonRoutes } from "./season/routes.ts";
 import { SeasonService } from "./season/service.ts";
+import { testSeasonSyncer } from "./testSeason.ts";
 
 export interface AppDeps {
   env: Env;
@@ -69,6 +70,7 @@ export async function buildApp({ env, db, auth, getUser, draft, leagues, season,
     const roster = new RosterService(db, seasonService, season ?? {});
     // Waivers that have cleared (and trades whose review is over) settle before anyone reads the league.
     seasonService.beforeLoad = (leagueId) => roster.settle(leagueId);
+    roster.beforeSettle = testSeasonSyncer(db);
     registerSeasonRoutes(app, seasonService, guards);
     registerRosterRoutes(app, roster, guards);
     registerTradeRoutes(app, new TradeService(db, seasonService, roster, season ?? {}), guards);

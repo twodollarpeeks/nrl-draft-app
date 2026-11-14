@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLeagueId } from "../lib/activeLeague.tsx";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { MAX_TRADE_PLAYERS, type TradePlayer, type TradeView, type TradesView } from "@nrl/shared";
 import { AppShell } from "../components/Layout.tsx";
@@ -18,11 +19,11 @@ const STATUS: Record<TradeView["status"], string> = {
 };
 
 export function TradesPage() {
-  const { id = "" } = useParams();
+  const id = useLeagueId();
   const trades = useTrades(id);
   if (!trades.data) {
     return (
-      <AppShell title="Trades" back={`/l/${id}`} width="wide">
+      <AppShell title="Trades" back={`/league`} width="wide">
         {trades.error ? <ErrorText error={trades.error} /> : <Spinner />}
       </AppShell>
     );
@@ -36,7 +37,7 @@ export function TradesPage() {
   const done = t.filter((x) => !["proposed", "review"].includes(x.status));
 
   return (
-    <AppShell title="Trades" back={`/l/${id}`} width="wide" league={{ id, myTeamId: data.myTeamId }}>
+    <AppShell title="Trades" back={`/league`} width="wide" league={{ id, myTeamId: data.myTeamId }}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted">
           Accepted trades are reviewed for {data.reviewHours} hours: other managers can vote, and the commissioner approves or
@@ -45,7 +46,7 @@ export function TradesPage() {
             (data.deadline.closed ? " Trades are closed for the season." : ` Trades close when round ${data.deadline.round} starts.`)}
         </p>
         {!data.deadline?.closed && (
-          <Link to={`/l/${id}/trades/new`} className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-bg">
+          <Link to={`/trades/new`} className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-bg">
             Propose a trade
           </Link>
         )}
@@ -161,11 +162,11 @@ function Side({ title, players }: { title: string; players: TradePlayer[] }) {
 
 /** Build an offer: pick a team, then players from both squads. */
 export function ProposeTradePage() {
-  const { id = "" } = useParams();
+  const id = useLeagueId();
   const trades = useTrades(id);
   if (!trades.data) {
     return (
-      <AppShell title="Propose a trade" back={`/l/${id}/trades`}>
+      <AppShell title="Propose a trade" back={`/trades`}>
         {trades.error ? <ErrorText error={trades.error} /> : <Spinner />}
       </AppShell>
     );
@@ -189,7 +190,7 @@ function Builder({ data }: { data: TradesView }) {
     set(list.includes(id) ? list.filter((x) => x !== id) : list.length < MAX_TRADE_PLAYERS ? [...list, id] : list);
 
   return (
-    <AppShell title="Propose a trade" back={`/l/${data.leagueId}/trades`} width="wide">
+    <AppShell title="Propose a trade" back={`/trades`} width="wide">
       <Field label="Trade with">
         <select className={`${inputClass} lg:max-w-sm`} value={withTeam} onChange={(e) => { setWithTeam(e.target.value); setGet([]); }}>
           {others.map((t) => (
@@ -213,7 +214,7 @@ function Builder({ data }: { data: TradesView }) {
         onClick={() =>
           propose.mutate(
             { fromTeamId: data.myTeamId, toTeamId: withTeam, give, get, ...(message.trim() ? { message: message.trim() } : {}) },
-            { onSuccess: () => navigate(`/l/${data.leagueId}/trades`) },
+            { onSuccess: () => navigate(`/trades`) },
           )
         }
       >

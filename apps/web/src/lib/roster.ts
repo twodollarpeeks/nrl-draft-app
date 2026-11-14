@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ActivityItem, AddPlayerInput, PlayersView } from "@nrl/shared";
+import type { ActivityItem, AddPlayerInput, PlayerSeasonView, PlayersView } from "@nrl/shared";
 import { api } from "./api.ts";
 
 export const rosterKeys = {
@@ -9,6 +9,13 @@ export const rosterKeys = {
 
 export const usePlayers = (leagueId: string) =>
   useQuery({ queryKey: rosterKeys.players(leagueId), queryFn: () => api<PlayersView>(`/api/leagues/${leagueId}/players`) });
+
+export const usePlayerSeason = (leagueId: string, playerId: number | undefined) =>
+  useQuery({
+    queryKey: [...rosterKeys.players(leagueId), playerId, "season"],
+    queryFn: () => api<PlayerSeasonView>(`/api/leagues/${leagueId}/players/${playerId}/season`),
+    enabled: playerId !== undefined,
+  });
 
 export const useActivity = (leagueId: string, enabled = true) =>
   useQuery({

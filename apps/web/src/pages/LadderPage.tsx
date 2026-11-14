@@ -1,15 +1,15 @@
-import { useParams } from "react-router";
+import { useLeagueId } from "../lib/activeLeague.tsx";
 import { AppShell } from "../components/Layout.tsx";
 import { Card, ErrorText, SectionTitle, Spinner } from "../components/ui.tsx";
 import { formatPoints, useSeason } from "../lib/season.ts";
 import { MatchupCard } from "./MatchupsPage.tsx";
 
 export function LadderPage() {
-  const { id = "" } = useParams();
+  const id = useLeagueId();
   const season = useSeason(id);
   if (!season.data) {
     return (
-      <AppShell title="Ladder" back={`/l/${id}`}>
+      <AppShell title="Ladder" back={`/league`}>
         {season.error ? <ErrorText error={season.error} /> : <Spinner />}
       </AppShell>
     );
@@ -20,7 +20,7 @@ export function LadderPage() {
   const weeks = [...new Set(s.finals?.games.map((g) => g.round) ?? [])];
 
   return (
-    <AppShell title="Ladder" back={`/l/${id}`} width="wide" league={{ id, myTeamId: s.myTeamId }}>
+    <AppShell title="Ladder" back={`/league`} width="wide" league={{ id, myTeamId: s.myTeamId }}>
       <div className="flex flex-col gap-4 lg:gap-6">
         <Card className="overflow-x-auto p-0 lg:mx-auto lg:w-full lg:max-w-3xl">
           <table className="w-full text-xs sm:text-sm lg:text-base">

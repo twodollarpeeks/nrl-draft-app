@@ -86,3 +86,17 @@ export function groupsLabel(positions: readonly NrlPosition[]): string {
     .map((g) => POSITION_GROUP_SHORT[g])
     .join(" · ");
 }
+
+/** "Lachlan Galvin's Team" -> "lachlan-galvins-team": for readable addresses. */
+export function slugify(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** A player's address name: surname first, "galvin-lachlan". */
+export const playerSlug = (firstName: string, lastName: string) => slugify(`${lastName} ${firstName}`);

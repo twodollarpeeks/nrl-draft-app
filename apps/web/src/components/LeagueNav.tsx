@@ -14,11 +14,11 @@ export function LeagueTabs({
   variant: "bottom" | "header";
 }) {
   const tabs: Array<[string, string, boolean]> = [
-    [`/l/${leagueId}`, "Home", true],
-    [`/l/${leagueId}/team/${myTeamId}`, "My team", false],
-    [`/l/${leagueId}/players`, "Players", false],
-    [`/l/${leagueId}/matchups`, "Matchups", false],
-    [`/l/${leagueId}/ladder`, "Ladder", false],
+    [`/league`, "Home", true],
+    ["/myteam", "My team", false],
+    [`/players`, "Players", false],
+    [`/matchups`, "Matchups", false],
+    [`/ladder`, "Ladder", false],
   ];
   if (variant === "header") {
     return (

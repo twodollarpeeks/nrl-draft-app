@@ -3,6 +3,7 @@ import {
   DEFAULT_LEAGUE_SETTINGS,
   type ActivityItem,
   type LeagueSettings,
+  type PlayerSeasonView,
   type PlayersView,
   type TeamRoundView,
   type TradesView,
@@ -156,6 +157,25 @@ describe.runIf(hasTestDb)("free agency and waivers", () => {
     expect(view.players.find((p) => p.id === 1)).toMatchObject({ availability: "owned", ownerTeamId: teamIds[0] });
   });
 
+  it("shows a player's season round by round", async () => {
+    expect((await players(0)).body.players.find((p) => p.id === 500)?.slug).toBe("500-p");
+    const season = await call<PlayerSeasonView>(users[0]!.id, "GET", `/api/leagues/${leagueId}/players/500/season`);
+    expect(season.status).toBe(200);
+    const v = season.body;
+    // It's the day before round 3.
+    expect(v.rounds.slice(0, 4).map((r) => r.state)).toEqual(["played", "played", "upcoming", "upcoming"]);
+    expect(v.rounds[0]).toMatchObject({ opponent: "Bravo", home: true, minutes: 80 });
+    expect(v.rounds[1]!.stats.tries ?? 0).toBe(tries(500, 2));
+    expect(v.totals.games).toBe(2);
+    expect(v.totals.stats.tries ?? 0).toBe(tries(500, 1) + tries(500, 2));
+    // A Charlie player: a bye every round.
+    const bye = await call<PlayerSeasonView>(users[0]!.id, "GET", `/api/leagues/${leagueId}/players/502/season`);
+    expect(bye.body.rounds[0]?.state).toBe("bye");
+    // Only league members can look.
+    const outsider = await createUser(db, "Outsider");
+    expect((await call(outsider.id, "GET", `/api/leagues/${leagueId}/players/500/season`)).status).toBe(404);
+  });
+
   it("keeps earlier rounds' scores when a player who scored in them is dropped", async () => {
     // Team 0's winger (4) came off the bench for the centre on a bye in rounds 1 and 2.
     const r1 = await teamRound(0, 0, 1);
@@ -227,6 +247,14 @@ describe.runIf(hasTestDb)("free agency and waivers", () => {
     clock = new Date("2027-03-23T19:05:00Z");
     expect((await player(0, 501)).availability).toBe("free");
     expect((await add(0, 0, 501, 3)).status).toBe(204);
+  });
+
+  it("never locks players on a bye: no game, so they stay free to add, drop and move", async () => {
+    clock = new Date(kickoff(3).getTime() + 3_600_000);
+    expect((await teamRound(0, 0, 3)).body.players.find((p) => p.id === 3)).toMatchObject({ note: "bye", locked: false });
+    // Swap one bye centre for another mid-round: neither is locked or on waivers.
+    expect((await add(0, 0, 502, 3)).status).toBe(204);
+    expect(await squadIds(0)).toContain(502);
   });
 
   it("lets only the team's manager, or the commissioner, change a squad", async () => {

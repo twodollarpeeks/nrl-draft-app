@@ -13,7 +13,13 @@ finals at the end.
   pause/undo, a colour-coded board, and it survives refreshes and reconnects.
 - **Mock drafts:** practise any time against CPU teams (pick your slot, clock
   and CPU speed); finished mocks are saved to your history.
-- **Season:** lineups lock per player at kickoff; bye, not named and reserve
+- **Short addresses:** `/myteam`, `/players`, `/players/bulldogs/galvin-lachlan`,
+  `/matchups`, `/ladder` are for the league you opened last (remembered per
+  device; `/l/<id>` switches league).
+- **Player pages:** season summary, round-by-round stats and points, every
+  stat with per-game averages; add, claim, drop or propose a trade from there.
+- **Season:** lineups lock per player at kickoff (never on a bye); edit by
+  tapping or dragging, on My team or your side of a head-to-head; bye, not named and reserve
   warnings; ordered emergencies; live scores (final after a 24-hour stats
   review); side-by-side matchups; ladder and finals.
 - **Free agency and waivers:** pick up free agents straight away; players
@@ -96,6 +102,23 @@ Needs Node.js 22+ (developed on 24) and npm 10+. Works in PowerShell or Git Bash
 
    Re-running replaces it, `--teams 10` changes the size, and
    `npm run seed -- --reset` removes it.
+
+7. Or try it mid-season: a test league replays 2026 on today's calendar
+   (shown as "2026 (test)"), with round 13 this week. Games then happen
+   with the real clock: team lists a few days ahead, scores from kickoff.
+
+   ```bash
+   npm run test-league -- setup
+   ```
+
+   | Command | What |
+   |---|---|
+   | `setup --round 20` | Rebuild it with another round this week (replaces the sample league) |
+   | `round 13` | Move the calendar so round 13 is next and not started (keeps squads and lineups) |
+   | `advance` (`--weeks 3`) | Jump a week on: this round's games are played |
+   | `cpu` | Demo managers accept your trade offers (`--reject` to refuse) and vote on trades |
+   | `cpu --offer` | ...and one of them offers you a trade |
+   | `status` | Where the test season is up to |
 
 ## Environment variables
 

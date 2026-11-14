@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { useLeagueId } from "../lib/activeLeague.tsx";
+import { Link } from "react-router";
 import { MIN_TEAMS, type DraftPlayer, type DraftState, type LeagueDetail, type NrlPosition } from "@nrl/shared";
 import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
 import { ClockBar } from "../components/draft/ClockBar.tsx";
@@ -12,17 +13,17 @@ import { useDraftAction, useDraftPlayers, useDraftState, useQueue } from "../lib
 import { useLeague } from "../lib/queries.ts";
 
 export function DraftRoomPage() {
-  const { id = "" } = useParams();
+  const id = useLeagueId();
   const league = useLeague(id);
   const draft = useDraftState(id);
   const players = useDraftPlayers(id);
 
   if (league.isPending || draft.isPending || players.isPending) {
-    return <AppShell title="Draft" back={`/l/${id}`}><Spinner /></AppShell>;
+    return <AppShell title="Draft" back={`/league`}><Spinner /></AppShell>;
   }
   if (!league.data || !draft.data || !players.data) {
     return (
-      <AppShell title="Draft" back={`/l/${id}`}>
+      <AppShell title="Draft" back={`/league`}>
         <ErrorText error={league.error ?? draft.error ?? players.error} />
       </AppShell>
     );
@@ -110,7 +111,7 @@ function Room({
   return (
     <DraftLayout
       title={`${league.name} draft`}
-      back={`/l/${leagueId}`}
+      back={`/league`}
       backLabel="Back to league"
       clock={<ClockBar state={state} myTeamId={myTeamId} picksUntilMine={until} connection={connection} />}
       banner={
@@ -134,7 +135,7 @@ function Room({
                 <div className="font-semibold">The draft is done 🏉</div>
                 <div className="text-sm text-muted">Every team has its squad. Set your lineup before round 1.</div>
               </div>
-              <Link to={`/l/${leagueId}`} className="text-sm font-medium text-accent">
+              <Link to={`/league`} className="text-sm font-medium text-accent">
                 League →
               </Link>
             </Card>

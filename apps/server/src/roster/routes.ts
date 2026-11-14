@@ -7,6 +7,9 @@ export function registerRosterRoutes(app: FastifyInstance, roster: RosterService
   type P = { Params: { id: string; claimId: string } };
 
   app.get<P>("/api/leagues/:id/players", async (req) => roster.players(await requireUser(req), req.params.id));
+  app.get<{ Params: { id: string; playerId: string } }>("/api/leagues/:id/players/:playerId/season", async (req) =>
+    roster.playerSeason(await requireUser(req), req.params.id, Number(req.params.playerId)),
+  );
   app.get<P>("/api/leagues/:id/activity", async (req) => roster.activity(await requireUser(req), req.params.id));
 
   app.post<P>("/api/leagues/:id/roster/add", async (req, reply) => {

@@ -1,12 +1,15 @@
 import { Link, useNavigate, useParams } from "react-router";
 import type { MatchupSide, MatchupView } from "@nrl/shared";
 import { AppShell } from "../components/Layout.tsx";
+import { matchupPath, teamPath, useLeagueId } from "../lib/activeLeague.tsx";
+import { useLeague } from "../lib/queries.ts";
 import { RoundPicker } from "../components/LeagueNav.tsx";
 import { Card, ErrorText, SectionTitle, Spinner } from "../components/ui.tsx";
 import { formatPoints, useRound, useSeason } from "../lib/season.ts";
 
 export function MatchupsPage() {
-  const { id = "", round: roundParam } = useParams();
+  const id = useLeagueId();
+  const { round: roundParam } = useParams();
   const navigate = useNavigate();
   const season = useSeason(id);
   const round = roundParam ? Number(roundParam) : season.data?.currentRound;
@@ -14,7 +17,7 @@ export function MatchupsPage() {
 
   if (!season.data || !view.data) {
     return (
-      <AppShell title="Matchups" back={`/l/${id}`}>
+      <AppShell title="Matchups" back={`/league`}>
         {season.error || view.error ? <ErrorText error={season.error ?? view.error} /> : <Spinner />}
       </AppShell>
     );
@@ -24,7 +27,7 @@ export function MatchupsPage() {
   const totalPoints = s.mode === "totalPoints";
 
   return (
-    <AppShell title={totalPoints ? "Scores" : "Matchups"} back={`/l/${id}`} width="wide" league={{ id, myTeamId: s.myTeamId }}>
+    <AppShell title={totalPoints ? "Scores" : "Matchups"} back={`/league`} width="wide" league={{ id, myTeamId: s.myTeamId }}>
       <div className="flex flex-col gap-4">
         <div className="lg:mx-auto lg:w-full lg:max-w-md">
           <RoundPicker
@@ -34,7 +37,7 @@ export function MatchupsPage() {
             last={s.grandFinalRound ?? s.lastRegularRound}
             title={v.title}
             status={v.status}
-            onChange={(r) => navigate(`/l/${id}/matchups/${r}`)}
+            onChange={(r) => navigate(`/matchups/${r}`)}
           />
         </div>
 
@@ -68,13 +71,18 @@ export function MatchupsPage() {
 }
 
 export function MatchupCard({ leagueId, matchup, myTeamId }: { leagueId: string; matchup: MatchupView; myTeamId: string }) {
+  const league = useLeague(leagueId).data;
   const mine = matchup.home?.teamId === myTeamId || matchup.away?.teamId === myTeamId;
   const both = matchup.home && matchup.away;
   return (
     <Card className={`relative ${mine ? "border-accent/60" : ""}`}>
       {both && (
         <Link
-          to={`/l/${leagueId}/matchup/${matchup.round}/${matchup.home!.teamId}/${matchup.away!.teamId}`}
+          to={
+            league
+              ? matchupPath(league, matchup.round, matchup.home!.teamId, matchup.away!.teamId)
+              : `/matchup/${matchup.round}/${matchup.home!.teamId}/${matchup.away!.teamId}`
+          }
           className="absolute inset-0 z-0 rounded-2xl"
           aria-label={`Open ${matchup.home!.name} v ${matchup.away!.name}`}
         />
@@ -123,6 +131,7 @@ function TeamLine({
   won?: boolean;
   lost?: boolean;
 }) {
+  const league = useLeague(leagueId).data;
   const content = (
     <>
       {rank !== undefined && <span className="w-5 text-right font-mono text-xs text-muted">{rank}</span>}
@@ -137,7 +146,7 @@ function TeamLine({
   );
   // Inside a matchup card the whole card is the link, so the row is just text.
   return asLink ? (
-    <Link to={`/l/${leagueId}/team/${side.teamId}/${round}`} className="flex items-center gap-3 py-2">
+    <Link to={league ? teamPath(league, side.teamId, round) : `/team/${side.teamId}/${round}`} className="flex items-center gap-3 py-2">
       {content}
     </Link>
   ) : (

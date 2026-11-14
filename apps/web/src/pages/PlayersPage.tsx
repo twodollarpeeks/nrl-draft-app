@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useParams } from "react-router";
 import {
   POSITION_GROUPS,
   POSITION_GROUP_SHORT,
@@ -8,7 +7,9 @@ import {
   type PlayersView,
   type PositionGroup,
 } from "@nrl/shared";
+import { Link } from "react-router";
 import { AppShell } from "../components/Layout.tsx";
+import { playerPath, useLeagueId } from "../lib/activeLeague.tsx";
 import { PositionBadge } from "../components/Position.tsx";
 import { Button, Card, Dialog, ErrorText, SectionTitle, Spinner, inputClass } from "../components/ui.tsx";
 import {
@@ -35,11 +36,11 @@ const PAGE = 50;
 
 /** Free agents, waivers and your claims. */
 export function PlayersPage() {
-  const { id = "" } = useParams();
+  const id = useLeagueId();
   const view = usePlayers(id);
   if (!view.data) {
     return (
-      <AppShell title="Players" back={`/l/${id}`} width="wide">
+      <AppShell title="Players" back={`/league`} width="wide">
         {view.error ? <ErrorText error={view.error} /> : <Spinner />}
       </AppShell>
     );
@@ -47,7 +48,7 @@ export function PlayersPage() {
   return <Players data={view.data} />;
 }
 
-type Action = { kind: "add" | "claim"; player: LeaguePlayer } | { kind: "drop"; player: LeaguePlayer };
+export type Action = { kind: "add" | "claim"; player: LeaguePlayer } | { kind: "drop"; player: LeaguePlayer };
 
 function Players({ data }: { data: PlayersView }) {
   const leagueId = data.leagueId;
@@ -84,7 +85,7 @@ function Players({ data }: { data: PlayersView }) {
     `min-h-9 shrink-0 rounded-full px-3 text-sm font-medium ${on ? "bg-accent text-bg" : "bg-surface-2 text-muted hover:text-text"}`;
 
   return (
-    <AppShell title="Players" back={`/l/${leagueId}`} width="wide" league={{ id: leagueId, myTeamId: data.myTeamId }}>
+    <AppShell title="Players" back={`/league`} width="wide" league={{ id: leagueId, myTeamId: data.myTeamId }}>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-6">
         <div className="flex flex-col gap-3">
           <Card className="text-sm">
@@ -137,7 +138,9 @@ function Players({ data }: { data: PlayersView }) {
             {list.slice(0, limit).map((p) => (
               <li key={p.id} className="flex items-center gap-3 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{p.name}</div>
+                  <Link to={playerPath(p)} className="block truncate font-medium hover:text-accent">
+                    {p.name}
+                  </Link>
                   <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted">
                     <span>{p.club?.nickName ?? "—"}</span>
                     <PositionBadge positions={p.positions} />
@@ -179,13 +182,13 @@ function Players({ data }: { data: PlayersView }) {
   );
 }
 
-function Status({ player, mine, owner }: { player: LeaguePlayer; mine: boolean; owner: string | undefined }) {
+export function Status({ player, mine, owner }: { player: LeaguePlayer; mine: boolean; owner: string | undefined }) {
   if (player.availability === "owned") return <span className={mine ? "text-accent" : ""}>{mine ? "Your squad" : owner}</span>;
   if (player.availability === "waivers") return <span className="rounded bg-review/15 px-1.5 py-0.5 font-semibold text-review">Waivers</span>;
   return <span className="rounded bg-accent/15 px-1.5 py-0.5 font-semibold text-accent">Free agent</span>;
 }
 
-function PlayerAction({
+export function PlayerAction({
   player,
   mine,
   claimed,
@@ -227,7 +230,7 @@ function PlayerAction({
 }
 
 /** Confirm an add, claim or drop; choose who to drop when needed. */
-function ActionDialog({ data, action, mine, onClose }: { data: PlayersView; action: Action; mine: LeaguePlayer[]; onClose: () => void }) {
+export function ActionDialog({ data, action, mine, onClose }: { data: PlayersView; action: Action; mine: LeaguePlayer[]; onClose: () => void }) {
   const add = useAddPlayer(data.leagueId);
   const claim = useClaim(data.leagueId);
   const drop = useDropPlayer(data.leagueId);

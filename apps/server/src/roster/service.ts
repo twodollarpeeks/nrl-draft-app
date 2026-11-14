@@ -1,7 +1,9 @@
 import type { Prisma, PrismaClient } from "@nrl/db";
 import { playerPoints } from "@nrl/scoring";
 import {
+  LeagueSettings,
   effectivePositions,
+  playerSlug,
   reconcileLineup,
   resolveWaivers,
   squadSize,
@@ -13,6 +15,8 @@ import {
   type ClaimView,
   type LeaguePlayer,
   type Lineup,
+  type PlayerSeasonRound,
+  type PlayerSeasonView,
   type PlayersView,
   type SquadPlayer,
 } from "@nrl/shared";
@@ -47,8 +51,12 @@ export class RosterService {
   /** Hooks run under the league lock before every read and change (trades add theirs). */
   readonly settlers: Array<(tx: Tx, leagueId: string) => Promise<void>> = [(tx, id) => this.settleWaivers(tx, id)];
 
+  /** Runs first in `settle` (a test season catches its games up with the clock). */
+  beforeSettle: ((leagueId: string) => Promise<void>) | null = null;
+
   /** Settle anything due for a league. Cheap when there's nothing to do. */
   async settle(leagueId: string): Promise<void> {
+    await this.beforeSettle?.(leagueId);
     if (!(await this.anythingDue(leagueId))) return;
     await this.inLeague(leagueId, async () => {});
   }
@@ -229,6 +237,7 @@ export class RosterService {
       return {
         id: p.id,
         name: `${p.firstName} ${p.lastName}`,
+        slug: playerSlug(p.firstName, p.lastName),
         club: p.club ? { key: p.club.key, nickName: p.club.nickName } : null,
         positions,
         ownerTeamId: owner,
@@ -267,6 +276,80 @@ export class RosterService {
       claims: claims.map(
         (c): ClaimView => ({ id: c.id, rank: c.rank, player: brief(c.playerId), drop: c.dropPlayerId !== null ? brief(c.dropPlayerId) : null }),
       ),
+    };
+  }
+
+  /** A player's season in the league's NRL season, round by round, under its scoring. */
+  async playerSeason(user: SessionUser, leagueId: string, playerId: number): Promise<PlayerSeasonView> {
+    await this.settle(leagueId);
+    const league = await this.db.league.findUnique({ where: { id: leagueId }, select: { season: true, settings: true } });
+    if (!league) throw notFound("League");
+    if (!(await this.db.team.findFirst({ where: { leagueId, ownerId: user.id }, select: { id: true } }))) throw notFound("League");
+    const player = await this.db.player.findUnique({ where: { id: playerId }, select: { id: true, clubId: true, club: { select: { key: true } } } });
+    if (!player) throw notFound("Player");
+    const scoring = LeagueSettings.parse(league.settings).scoring;
+
+    const [rounds, apps] = await Promise.all([
+      this.db.round.findMany({
+        where: { season: league.season, matches: { some: {} } },
+        orderBy: { number: "asc" },
+        include: { matches: { include: { homeClub: true, awayClub: true } } },
+      }),
+      this.db.appearance.findMany({
+        where: { playerId, match: { round: { season: league.season } } },
+        select: { matchId: true, clubId: true, jersey: true, minutes: true, stats: true },
+      }),
+    ]);
+    const byMatch = new Map(apps.map((a) => [a.matchId, a]));
+    const now = this.now();
+    const totals = { games: 0, points: 0, minutes: 0, stats: {} as Record<string, number> };
+
+    const out: PlayerSeasonRound[] = rounds.map((r) => {
+      const app = r.matches.map((m) => byMatch.get(m.id)).find((a) => a) ?? null;
+      const clubId = app?.clubId ?? player.clubId;
+      const match = r.matches.find((m) => (app ? m.id === app.matchId : m.homeClubId === clubId || m.awayClubId === clubId)) ?? null;
+      const home = match ? match.homeClubId === clubId : null;
+      const base = {
+        round: r.number,
+        title: r.title,
+        opponent: match ? (home ? match.awayClub.nickName : match.homeClub.nickName) : null,
+        home,
+        kickoffAt: match?.kickoffAt.toISOString() ?? null,
+        jersey: app?.jersey ?? null,
+        minutes: app?.minutes ?? null,
+        points: null as number | null,
+        stats: {} as Record<string, number>,
+      };
+      if (!match) {
+        const bye = !!player.club && clubId === player.clubId && r.byeClubKeys.includes(player.club.key);
+        return { ...base, state: bye ? ("bye" as const) : ("noGame" as const) };
+      }
+      if (match.kickoffAt > now) return { ...base, state: "upcoming" as const };
+      if (!app) return { ...base, state: "notNamed" as const };
+      const raw = (app.stats as Record<string, unknown> | null) ?? null;
+      if (!raw || (app.minutes ?? 0) === 0) {
+        return { ...base, state: match.state === "FullTime" ? ("dnp" as const) : ("live" as const) };
+      }
+      const line = statLineFromRaw(raw);
+      const stats = Object.fromEntries(Object.entries(line).filter(([, v]) => v !== 0));
+      const points = playerPoints(line, scoring);
+      totals.games++;
+      totals.points += points;
+      totals.minutes += app.minutes ?? 0;
+      for (const [k, v] of Object.entries(stats)) totals.stats[k] = (totals.stats[k] ?? 0) + v;
+      return { ...base, state: match.state === "FullTime" ? ("played" as const) : ("live" as const), points, stats };
+    });
+
+    return {
+      playerId,
+      season: league.season,
+      scoring: Object.fromEntries(Object.entries(scoring).filter(([, v]) => v)),
+      rounds: out,
+      totals: {
+        ...totals,
+        points: Math.round(totals.points * 100) / 100,
+        avg: totals.games ? Math.round((totals.points / totals.games) * 10) / 10 : null,
+      },
     };
   }
 
@@ -440,8 +523,8 @@ export class RosterService {
   }
 
   /**
-   * Has a club's game (or, without one, the round) kicked off since `since`?
-   * Those players go on waivers until the next clearing.
+   * Has a club's game kicked off since `since`? Those players go on waivers
+   * until the next clearing. A club on a bye has no game, so its players don't.
    */
   private kickoffChecker(ctx: SeasonContext, since: Date, now: Date) {
     const kickoffs = [...ctx.rounds.values()].flatMap((r) => {
@@ -450,8 +533,8 @@ export class RosterService {
     });
     return (clubId: number | null) =>
       kickoffs.some((r) => {
-        const t = (clubId !== null ? r.byClub.get(clubId) : undefined) ?? r.first;
-        return t > since && t <= now;
+        const t = clubId !== null ? r.byClub.get(clubId) : undefined;
+        return !!t && t > since && t <= now;
       });
   }
 
@@ -464,8 +547,9 @@ export class RosterService {
     return (playerId: number, clubId?: number | null) => {
       if (!r || !r.firstKickoff || r.firstKickoff > now) return false;
       if (ctx.players.has(playerId)) return this.season.isLocked(ctx, playerId);
-      const t = (clubId != null ? clubPlays.get(clubId) : undefined) ?? r.firstKickoff;
-      return t <= now;
+      // No game this round (a bye): never locked.
+      const t = clubId != null ? clubPlays.get(clubId) : undefined;
+      return !!t && t <= now;
     };
   }
 

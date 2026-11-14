@@ -199,10 +199,12 @@ describe.runIf(hasTestDb)("season play", () => {
       clock = new Date(kickoff(1).getTime() + 60_000); // round 1 has kicked off
     });
 
-    it("locks players whose game has started; bye players lock with the round", async () => {
+    it("locks players whose game has started; bye players never lock", async () => {
       const res = await teamRound(0, 0, 1);
       expect(res.body.roundStatus).toBe("live");
-      expect(res.body.players.every((p) => p.locked)).toBe(true);
+      // Team 0's centre (3) plays for Charlie, on a bye every round.
+      expect(res.body.players.filter((p) => p.locked).map((p) => p.id).sort()).toEqual([1, 2, 4]);
+      expect(res.body.players.find((p) => p.id === 3)).toMatchObject({ note: "bye", locked: false });
       const url = `/api/leagues/${leagueId}/teams/${teamIds[0]}/rounds/1/lineup`;
       const moved = await call(users[0]!.id, "PUT", url, { starters: { HB_HK: [1], FWD: [2], OB: [4] }, bench: [3] });
       expect(moved).toMatchObject({ status: 409, body: { error: "player_locked" } });

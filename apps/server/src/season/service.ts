@@ -292,8 +292,8 @@ export class SeasonService {
     else if (!app && match && (matchStarted || ctx.teamListsOut.has(match.id))) note = "notNamed";
     else if (app && app.jersey >= FIRST_RESERVE_JERSEY && !matchFinished) note = "reserve";
 
-    // A bye player locks with the round's first game; anyone else at their own kickoff.
-    const locked = match ? matchStarted : bye ? !!round?.firstKickoff && round.firstKickoff <= now : false;
+    // Players lock at their own game's kickoff. No game (a bye) means nothing to lock for.
+    const locked = matchStarted;
 
     const scoreState: ScoreState = match
       ? matchScoreState(match, now)

@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import "./index.css";
 import { RequireAuth } from "./components/Layout.tsx";
+import { ActiveLeague, SwitchLeague } from "./lib/activeLeague.tsx";
 import { ApiRequestError } from "./lib/api.ts";
 import { AdminPlayersPage } from "./pages/AdminPlayersPage.tsx";
 import { AdminScoringPage } from "./pages/AdminScoringPage.tsx";
@@ -21,6 +22,7 @@ import { JoinPage } from "./pages/JoinPage.tsx";
 import { LeaguePage } from "./pages/LeaguePage.tsx";
 import { LeagueSettingsPage } from "./pages/LeagueSettingsPage.tsx";
 import { LeaguesPage } from "./pages/LeaguesPage.tsx";
+import { PlayerPage } from "./pages/PlayerPage.tsx";
 import { PlayersPage } from "./pages/PlayersPage.tsx";
 import { ProfilePage } from "./pages/ProfilePage.tsx";
 import { ProposeTradePage, TradesPage } from "./pages/TradesPage.tsx";
@@ -36,6 +38,7 @@ const queryClient = new QueryClient({
 });
 
 const authed = (page: ReactNode) => <RequireAuth>{page}</RequireAuth>;
+const inLeague = (page: ReactNode) => authed(<ActiveLeague>{page}</ActiveLeague>);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -47,16 +50,20 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/leagues/new" element={authed(<CreateLeaguePage />)} />
           <Route path="/join/:code" element={authed(<JoinPage />)} />
           <Route path="/handover/:code" element={authed(<HandoverPage />)} />
-          <Route path="/l/:id" element={authed(<LeaguePage />)} />
-          <Route path="/l/:id/draft" element={authed(<DraftRoomPage />)} />
-          <Route path="/l/:id/team/:teamId/:round?" element={authed(<TeamRoundPage />)} />
-          <Route path="/l/:id/matchups/:round?" element={authed(<MatchupsPage />)} />
-          <Route path="/l/:id/matchup/:round/:homeId/:awayId" element={authed(<MatchupPage />)} />
-          <Route path="/l/:id/ladder" element={authed(<LadderPage />)} />
-          <Route path="/l/:id/players" element={authed(<PlayersPage />)} />
-          <Route path="/l/:id/trades" element={authed(<TradesPage />)} />
-          <Route path="/l/:id/trades/new" element={authed(<ProposeTradePage />)} />
-          <Route path="/l/:id/settings" element={authed(<LeagueSettingsPage />)} />
+          {/* A league's pages, for the league you opened last (/l/<id>/... switches league). */}
+          <Route path="/l/:id/*" element={<SwitchLeague />} />
+          <Route path="/league" element={inLeague(<LeaguePage />)} />
+          <Route path="/draft" element={inLeague(<DraftRoomPage />)} />
+          <Route path="/myteam/:round?" element={inLeague(<TeamRoundPage />)} />
+          <Route path="/team/:teamId/:round?" element={inLeague(<TeamRoundPage />)} />
+          <Route path="/matchups/:round?" element={inLeague(<MatchupsPage />)} />
+          <Route path="/matchup/:round/:homeId/:awayId" element={inLeague(<MatchupPage />)} />
+          <Route path="/ladder" element={inLeague(<LadderPage />)} />
+          <Route path="/players" element={inLeague(<PlayersPage />)} />
+          <Route path="/players/:club/:slug" element={inLeague(<PlayerPage />)} />
+          <Route path="/trades" element={inLeague(<TradesPage />)} />
+          <Route path="/trades/new" element={inLeague(<ProposeTradePage />)} />
+          <Route path="/settings" element={inLeague(<LeagueSettingsPage />)} />
           <Route path="/mock" element={authed(<MockDraftsPage />)} />
           <Route path="/mock/play" element={authed(<MockRoomPage />)} />
           <Route path="/mock/:id" element={authed(<MockResultPage />)} />

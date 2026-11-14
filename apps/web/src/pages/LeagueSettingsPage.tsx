@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useNavigate, useParams } from "react-router";
+import { useLeagueId } from "../lib/activeLeague.tsx";
+import { Navigate, useNavigate } from "react-router";
 import { LeagueName, LeagueSettings, type DraftOrderMode, type LeagueDetail } from "@nrl/shared";
 import { DraftOrderList, DraftScheduleFields } from "../components/DraftSetup.tsx";
 import { AppShell } from "../components/Layout.tsx";
@@ -18,12 +19,12 @@ import {
 } from "../lib/queries.ts";
 
 export function LeagueSettingsPage() {
-  const { id = "" } = useParams();
+  const id = useLeagueId();
   const { data: league, isPending, error } = useLeague(id);
   const defaults = useLeagueDefaults();
-  if (isPending || defaults.isPending) return <AppShell back={`/l/${id}`}><Spinner /></AppShell>;
-  if (!league || !defaults.data) return <AppShell back={`/l/${id}`}><ErrorText error={error ?? defaults.error} /></AppShell>;
-  if (!league.isCommissioner) return <Navigate to={`/l/${id}`} replace />;
+  if (isPending || defaults.isPending) return <AppShell back={`/league`}><Spinner /></AppShell>;
+  if (!league || !defaults.data) return <AppShell back={`/league`}><ErrorText error={error ?? defaults.error} /></AppShell>;
+  if (!league.isCommissioner) return <Navigate to={`/league`} replace />;
   return <SettingsForm league={league} limits={defaults.data} />;
 }
 
@@ -57,11 +58,11 @@ function SettingsForm({ league, limits }: { league: LeagueDetail; limits: Settin
             ...(orderMode !== league.draftOrderMode ? { draftOrderMode: orderMode } : {}),
           }),
     });
-    navigate(`/l/${league.id}`);
+    navigate(`/league`);
   }
 
   return (
-    <AppShell title="League settings" back={`/l/${league.id}`} width="wide">
+    <AppShell title="League settings" back={`/league`} width="wide">
       <form onSubmit={submit} className="flex flex-col gap-4">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
           <Card>
@@ -170,7 +171,7 @@ function Managers({ league }: { league: LeagueDetail }) {
                     disabled={busy}
                     onClick={() => {
                       if (!confirm(`Make ${t.owner.name} the commissioner? You'll lose commissioner tools.`)) return;
-                      promote.mutate(t.id, { onSuccess: () => navigate(`/l/${league.id}`) });
+                      promote.mutate(t.id, { onSuccess: () => navigate(`/league`) });
                     }}
                   >
                     Make commissioner

@@ -24,7 +24,8 @@
     "postinstall": "npm run generate -w @nrl/db",
     "report:points": "tsx --env-file-if-exists=.env scripts/points-report.ts",
     "wake": "tsx --env-file-if-exists=.env scripts/wake.ts",
-    "seed": "tsx --env-file-if-exists=.env apps/server/scripts/seed.ts"
+    "seed": "tsx --env-file-if-exists=.env apps/server/scripts/seed.ts",
+    "test-league": "tsx --env-file-if-exists=.env apps/server/scripts/test-league.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

@@ -245,7 +245,7 @@ export interface PlayerRoundView {
   /** How settled their points are: upcoming, live, in review (stats still being checked), final. */
   scoreState: ScoreState;
   note: PlayerNote | null;
-  /** Their match has kicked off (or, on a bye, the round has): can't be moved. */
+  /** Their match has kicked off: can't be moved. Never on a bye. */
   locked: boolean;
   jersey: number | null;
   match: { opponent: string; home: boolean; kickoffAt: string; state: string } | null;
@@ -398,6 +398,8 @@ export type PlayerAvailability = "owned" | "free" | "waivers";
 export interface LeaguePlayer {
   id: number;
   name: string;
+  /** For their page's address: "galvin-lachlan" (with the club key: /players/bulldogs/galvin-lachlan). */
+  slug: string;
   club: { key: string; nickName: string } | null;
   positions: NrlPosition[];
   ownerTeamId: string | null;
@@ -410,6 +412,34 @@ export interface LeaguePlayer {
   /** Last season's, while this season is young (null when there's no earlier season). */
   prevAvg: number | null;
   prevGames: number;
+}
+
+/** One round of a player's season. */
+export interface PlayerSeasonRound {
+  round: number;
+  title: string;
+  /** Their club's game (null on a bye or with no draw). */
+  opponent: string | null;
+  home: boolean | null;
+  kickoffAt: string | null;
+  /** played: took the field; dnp: named but no minutes; notNamed: not in the team; live: game under way. */
+  state: "upcoming" | "live" | "played" | "dnp" | "notNamed" | "bye" | "noGame";
+  jersey: number | null;
+  minutes: number | null;
+  /** Under the league's scoring (null when they didn't play). */
+  points: number | null;
+  /** Every catalogue stat they recorded (zeros left out). */
+  stats: Record<string, number>;
+}
+
+/** A player's season so far, round by round, for their page. */
+export interface PlayerSeasonView {
+  playerId: number;
+  season: number;
+  /** Stats the league scores, with their points value each. */
+  scoring: Record<string, number>;
+  rounds: PlayerSeasonRound[];
+  totals: { games: number; points: number; avg: number | null; minutes: number; stats: Record<string, number> };
 }
 
 export interface ClaimView {

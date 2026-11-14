@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { seasonLabel } from "@nrl/shared";
 import { AppShell } from "../components/Layout.tsx";
 import { Card, ErrorText, Spinner } from "../components/ui.tsx";
 import { useMyLeagues } from "../lib/queries.ts";
@@ -48,7 +49,7 @@ export function LeaguesPage() {
               <div className="min-w-0">
                 <div className="truncate font-semibold">{l.name}</div>
                 <div className="text-sm text-muted">
-                  {l.season} · {l.teamsJoined}/{l.teamCount} teams{l.isCommissioner ? " · Commissioner" : ""}
+                  {seasonLabel(l.season)} · {l.teamsJoined}/{l.teamCount} teams{l.isCommissioner ? " · Commissioner" : ""}
                 </div>
               </div>
               <span className="shrink-0 rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-muted">{STATUS_LABEL[l.status]}</span>

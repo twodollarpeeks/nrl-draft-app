@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router";
-import { MIN_TEAMS, seasonRounds, squadSize, type LeagueDetail } from "@nrl/shared";
+import { useLeagueId } from "../lib/activeLeague.tsx";
+import { Link } from "react-router";
+import { MIN_TEAMS, seasonLabel, seasonRounds, squadSize, type LeagueDetail } from "@nrl/shared";
 import { DraftOrderList, formatDraftTime } from "../components/DraftSetup.tsx";
 import { formatPoints, useRound, useSeason } from "../lib/season.ts";
 import { MatchupCard } from "./MatchupsPage.tsx";
@@ -12,7 +13,7 @@ import { Avatar, Button, Card, ErrorText, SectionTitle, Spinner, inputClass } fr
 import { useLeague, useRenameTeam } from "../lib/queries.ts";
 
 export function LeaguePage() {
-  const { id = "" } = useParams();
+  const id = useLeagueId();
   const { data: league, isPending, error } = useLeague(id);
 
   if (isPending) return <AppShell back="/leagues"><Spinner /></AppShell>;
@@ -83,7 +84,7 @@ function LadderSnapshot({ league }: { league: LeagueDetail }) {
     <Card className="hidden lg:block">
       <div className="mb-3 flex items-center justify-between">
         <SectionTitle>Ladder</SectionTitle>
-        <Link to={`/l/${league.id}/ladder`} className="text-sm font-medium text-accent">
+        <Link to={`/ladder`} className="text-sm font-medium text-accent">
           Full ladder →
         </Link>
       </div>
@@ -110,7 +111,7 @@ function TradesCard({ league }: { league: LeagueDetail }) {
   const summary = [forMe && `${forMe} offer${forMe === 1 ? "" : "s"} for you`, review && `${review} in review`].filter(Boolean).join(" · ");
   return (
     <Link
-      to={`/l/${league.id}/trades`}
+      to={`/trades`}
       className={`flex items-center justify-between rounded-2xl border p-4 ${forMe ? "border-accent bg-accent/10" : "border-border bg-surface hover:border-accent"}`}
     >
       <div>
@@ -155,7 +156,7 @@ function ThisRoundCard({ league }: { league: LeagueDetail }) {
         </Card>
       )}
       <Link
-        to={`/l/${league.id}/team/${s.myTeamId}/${r.round}`}
+        to={`/myteam/${r.round}`}
         className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-bg"
       >
         {r.status === "complete" ? "See your team" : "Set your lineup"}
@@ -187,7 +188,7 @@ function DraftCard({ league }: { league: LeagueDetail }) {
   }[league.status];
   return (
     <Link
-      to={`/l/${league.id}/draft`}
+      to={`/draft`}
       className={`flex items-center justify-between rounded-2xl border p-4 ${
         league.status === "drafting" ? "border-accent bg-accent/10" : "border-border bg-surface hover:border-accent"
       }`}
@@ -293,14 +294,14 @@ function SettingsSummary({ league, className }: { league: LeagueDetail; classNam
       <div className="mb-3 flex items-center justify-between">
         <SectionTitle>Rules</SectionTitle>
         {league.isCommissioner && (
-          <Link to={`/l/${league.id}/settings`} className="text-sm font-medium text-accent">
+          <Link to={`/settings`} className="text-sm font-medium text-accent">
             {league.status === "setup" ? "Edit" : "Commissioner tools"}
           </Link>
         )}
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
         <dt className="text-muted">NRL season</dt>
-        <dd>{league.season}</dd>
+        <dd>{seasonLabel(league.season)}</dd>
         <dt className="text-muted">Format</dt>
         <dd>{format}</dd>
         <dt className="text-muted">Fantasy rounds</dt>
